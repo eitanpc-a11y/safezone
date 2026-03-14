@@ -15,7 +15,7 @@
         .btn-grid { display: grid; gap: 12px; margin-top: 10px; }
         .emergency-btn { padding: 22px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
-        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; font-size: 1rem; }
+        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; font-size: 0.95rem; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -48,12 +48,9 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // טעינת פרטים שמורים מהזיכרון של המכשיר
         window.onload = () => {
-            const savedName = localStorage.getItem('safezone_name');
-            const savedPhone = localStorage.getItem('safezone_phone');
-            if (savedName) document.getElementById('userName').value = savedName;
-            if (savedPhone) document.getElementById('userPhone').value = savedPhone;
+            document.getElementById('userName').value = localStorage.getItem('safezone_name') || "";
+            document.getElementById('userPhone').value = localStorage.getItem('safezone_phone') || "";
         };
 
         async function sendReport(status) {
@@ -61,47 +58,56 @@
             const name = document.getElementById('userName').value;
             const phone = document.getElementById('userPhone').value;
             
-            if (!name) { alert("חובה להזין שם"); return; }
-            
-            // שמירת הפרטים לשימוש הבא
+            if (!name) { alert("אנא הזן שם"); return; }
             localStorage.setItem('safezone_name', name);
             localStorage.setItem('safezone_phone', phone);
 
-            msg.innerText = "מאתר מיקום ושולח... 📡";
-            msg.style.color = "blue";
+            msg.innerText = "מחפש לוויינים... 📡";
+            msg.style.color = "#1a73e8";
 
-            if (!navigator.geolocation) {
-                msg.innerText = "❌ הדפדפן לא תומך במיקום";
-                return;
+            // הגדרות GPS גמישות יותר למצבי שיבושים
+            const options = {
+                enableHighAccuracy: false, // כיבוי דיוק גבוה עוזר לעקוף שיבושי GPS
+                timeout: 8000,             // מחכה 8 שניות בלבד
+                maximumAge: 60000          // מאפשר להשתמש במיקום שנשמר לפני דקה
+            };
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => saveToFirebase(pos.coords.latitude, pos.coords.longitude, status),
+                    (err) => {
+                        console.error(err);
+                        msg.innerText = "⚠️ קושי באיתור מדויק. מנסה לשלוח מיקום משוער...";
+                        // ניסיון שלישי עם הגדרות הכי בסיסיות
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => saveToFirebase(pos.coords.latitude, pos.coords.longitude, status),
+                            () => { msg.innerText = "❌ לא ניתן לאתר מיקום. וודא שה-GPS פועל ושאושרת גישה."; msg.style.color = "red"; }
+                        );
+                    }, 
+                    options
+                );
             }
+        }
 
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                try {
-                    await db.collection("reports").add({
-                        name: name,
-                        phone: phone || "לא צוין",
-                        status: status,
-                        lat: pos.coords.latitude,
-                        lng: pos.coords.longitude,
-                        time: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    msg.innerText = "✅ הדיווח התקבל בחמ\"ל!";
-                    msg.style.color = "green";
-                } catch (e) {
-                    msg.innerText = "❌ שגיאת שרת: " + e.message;
-                    msg.style.color = "red";
-                }
-            }, (err) => {
-                let errorDesc = "שגיאת מיקום";
-                if (err.code === 1) errorDesc = "חובה לאשר גישה למיקום!";
-                if (err.code === 3) errorDesc = "זמן האיתור תם (נסה שוב)";
-                msg.innerText = "❌ " + errorDesc;
+        async function saveToFirebase(lat, lng, status) {
+            const msg = document.getElementById('status-msg');
+            msg.innerText = "המיקום נמצא! שולח נתונים... 📤";
+            
+            try {
+                await db.collection("reports").add({
+                    name: document.getElementById('userName').value,
+                    phone: document.getElementById('userPhone').value || "לא צוין",
+                    status: status,
+                    lat: lat,
+                    lng: lng,
+                    time: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                msg.innerText = "✅ הדיווח התקבל בהצלחה בחמ\"ל!";
+                msg.style.color = "green";
+            } catch (e) {
+                msg.innerText = "❌ שגיאת תקשורת: " + e.message;
                 msg.style.color = "red";
-            }, {
-                enableHighAccuracy: true,
-                timeout: 15000, // מחכה מקסימום 15 שניות
-                maximumAge: 0
-            });
+            }
         }
     </script>
 </body>
