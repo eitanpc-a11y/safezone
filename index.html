@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SafeZone - ניטור ודיווח</title>
     <link rel="manifest" href="manifest.json">
-    
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <style>
         :root { --red: #d32f2f; --orange: #f57c00; --green: #388e3c; --dark: #121212; }
         body { font-family: system-ui, sans-serif; background: var(--dark); color: white; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
@@ -28,13 +26,12 @@
     </style>
 </head>
 <body>
-
     <div class="container">
         <div id="standby-screen">
             <div style="font-size: 3rem; margin-bottom: 10px;">🛡️</div>
             <h2>SafeZone במצב ניטור</h2>
             <input type="text" id="userName" placeholder="שם מלא">
-            <input type="text" id="userCity" placeholder="עיר (למשל: תל אביב)">
+            <input type="text" id="userCity" placeholder="עיר (למשל: יהוד)">
             <button class="push-btn" id="push-btn" onclick="requestPushPermission()">🔔 הפעל התראות Push</button>
             <p id="debug-msg">יש להוסיף למסך הבית כדי לאפשר התראות</p>
             <button onclick="triggerEmergency()" style="margin-top:20px; background:none; border:none; color:#444; text-decoration:underline;">בדיקה ידנית</button>
@@ -74,17 +71,13 @@
             try {
                 debug.innerText = "מבקש הרשאה...";
                 const permission = await Notification.requestPermission();
-                
                 if (permission === 'granted') {
-                    debug.innerText = "הרשאה ניתנה. רושם מערכת...";
-                    
-                    // רישום Service Worker מפורש עבור iOS
                     const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-                    
                     debug.innerText = "מתחבר לשרת ההתראות...";
+                    
                     const token = await messaging.getToken({ 
-                        vapidKey: 'BMZ7U-clgjwA9J6oooT-wDLWKZP-PBXWI-Nm3ceOU2qsoeIGKWGgeSMeMaquGyLhpMwpV-zMDNOiqdXmeZGo',
-                        serviceWorkerRegistration: reg
+                        vapidKey: 'BIXCZU-c8gIaA5JScoc7-wDLWKZErE9YM1-NKt0ot0UZq6c6iGKWQgxBHaFzquGlyjL6pMwpV-vH0NOq6XmxZGo', 
+                        serviceWorkerRegistration: reg 
                     });
 
                     if (token) {
@@ -98,8 +91,8 @@
                     }
                 }
             } catch (e) {
+                alert("שגיאה: " + e.message);
                 debug.innerText = "שגיאה: " + e.message;
-                alert("שגיאה ברישום: " + e.message);
             }
         }
 
@@ -131,7 +124,6 @@
             localStorage.setItem('sz_name', document.getElementById('userName').value);
             localStorage.setItem('sz_city', document.getElementById('userCity').value);
             document.getElementById('status-msg').innerText = "מזהה מיקום...";
-            
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 if (Math.floor(pos.coords.latitude) === 53 || Math.floor(pos.coords.latitude) === 33) {
                     showManualMap();
