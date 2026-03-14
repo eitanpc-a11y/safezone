@@ -10,6 +10,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// טיפול בהודעות שמגיעות כשהדפדפן סגור
 messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
