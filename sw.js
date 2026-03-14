@@ -1,14 +1,20 @@
-const CACHE_NAME = 'safezone-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json'
-];
+self.addEventListener('push', function(event) {
+    const data = event.data.json();
+    const options = {
+        body: data.body,
+        icon: 'https://cdn-icons-png.flaticon.com/512/564/564619.png',
+        vibrate: [500, 100, 500],
+        data: { url: '/index.html?alert=true' }
+    };
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+    event.waitUntil(
+        self.registration.showNotification(data.title, options)
+    );
 });
 
-self.addEventListener('fetch', (e) => {
-  e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+self.addEventListener('notificationclick', function(event) {
+    event.notification.close();
+    event.waitUntil(
+        clients.openWindow(event.notification.data.url)
+    );
 });
