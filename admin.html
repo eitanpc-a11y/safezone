@@ -2,29 +2,39 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>חמ"ל SafeZone - ניהול</title>
+    <title>חמ"ל SafeZone - ניהול מבצעי</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; display: flex; height: 100vh; font-family: system-ui; }
-        #sidebar { width: 350px; background: #222; color: white; overflow-y: auto; padding: 15px; box-sizing: border-box; }
+        body { margin: 0; display: flex; height: 100vh; font-family: system-ui, sans-serif; background: #1a1a1a; }
+        #sidebar { width: 350px; background: #222; color: white; overflow-y: auto; padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid #444; }
         #map { flex-grow: 1; height: 100%; }
-        .report-item { background: #333; padding: 10px; margin-bottom: 10px; border-radius: 8px; border-right: 5px solid #666; }
-        .status-red { border-right-color: #ff5252; }
-        .status-green { border-right-color: #4caf50; }
-        h2 { border-bottom: 1px solid #444; padding-bottom: 10px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 15px; }
+        .clear-btn { background: #444; color: #ff5252; border: 1px solid #ff5252; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: 0.3s; }
+        .clear-btn:hover { background: #ff5252; color: white; }
+
+        .report-item { background: #333; padding: 12px; margin-bottom: 10px; border-radius: 8px; border-right: 5px solid #666; animation: fadeIn 0.5s ease; }
+        .status-red { border-right-color: #ff5252; background: rgba(255, 82, 82, 0.1); }
+        .status-green { border-right-color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+        small { color: #aaa; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <h2>דיווחים אחרונים</h2>
-        <div id="reports-list">ממתין לנתונים...</div>
+        <div class="header">
+            <h2 style="margin:0">דיווחים חיה</h2>
+            <button class="clear-btn" onclick="clearAllReports()">🗑️ ניקוי חמ"ל</button>
+        </div>
+        <div id="reports-list">טוען נתונים...</div>
     </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
@@ -32,30 +42,65 @@
             projectId: "safezone-cd4b5",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
         const map = L.map('map').setView([32.0853, 34.7818], 9);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         const listDiv = document.getElementById('reports-list');
+        const markers = {}; // שומר את הנקודות כדי שנוכל לנקות אותן
+
+        // פונקציית המחיקה
+        window.clearAllReports = async () => {
+            if (confirm("האם אתה בטוח שברצונך למחוק את כל הדיווחים מהמפה? פעולה זו אינה ניתנת לביטול.")) {
+                const querySnapshot = await getDocs(collection(db, "reports"));
+                querySnapshot.forEach(async (document) => {
+                    await deleteDoc(doc(db, "reports", document.id));
+                });
+                location.reload(); // רענון מהיר לניקוי סופי של התצוגה
+            }
+        };
+
         const q = query(collection(db, "reports"), orderBy("time", "desc"));
 
         onSnapshot(q, (snapshot) => {
             listDiv.innerHTML = "";
+            // ניקוי מרקרים קיימים מהמפה לפני עדכון
+            map.eachLayer((layer) => {
+                if (layer instanceof L.CircleMarker) map.removeLayer(layer);
+            });
+
+            if (snapshot.empty) {
+                listDiv.innerHTML = "<p style='text-align:center; color:#888'>אין דיווחים פעילים</p>";
+                return;
+            }
+
             snapshot.forEach((doc) => {
                 const d = doc.data();
-                const color = d.status === 'זקוק לעזרה' ? 'red' : 'green';
-                const time = d.time ? d.time.toDate().toLocaleTimeString('he-IL') : 'עכשיו';
+                const isEmergency = d.status === 'זקוק לעזרה';
+                const color = isEmergency ? 'red' : 'green';
+                const timeStr = d.time ? d.time.toDate().toLocaleTimeString('he-IL') : 'עכשיו';
 
                 // הוספה למפה
-                L.circleMarker([d.lat, d.lng], { color: color, radius: 10, fillOpacity: 0.8 }).addTo(map)
-                 .bindPopup(`<b>${d.name}</b><br>${d.status}`);
+                L.circleMarker([d.lat, d.lng], { 
+                    color: isEmergency ? '#ff5252' : '#4caf50', 
+                    radius: 12, 
+                    fillOpacity: 0.9,
+                    weight: 2
+                }).addTo(map).bindPopup(`<b>${d.name}</b><br>${d.status}`);
 
-                // הוספה לטבלה בצד
+                // הוספה לרשימה בצד
                 const item = document.createElement('div');
-                item.className = `report-item status-${color === 'red' ? 'red' : 'green'}`;
-                item.innerHTML = `<strong>${d.name}</strong><br>${d.status}<br><small>${time} | ${d.phone}</small>`;
+                item.className = `report-item ${isEmergency ? 'status-red' : 'status-green'}`;
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between">
+                        <strong>${d.name}</strong>
+                        <small>${timeStr}</small>
+                    </div>
+                    <div style="margin-top:5px">${d.status}</div>
+                    <small>${d.phone}</small>
+                `;
                 listDiv.appendChild(item);
             });
         });
