@@ -13,52 +13,95 @@
         h1 { color: var(--red); font-size: 2.2rem; margin-bottom: 5px; }
         input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1.1rem; text-align: center; }
         .btn-grid { display: grid; gap: 12px; margin-top: 10px; }
-        .emergency-btn { padding: 22px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; }
+        .emergency-btn { padding: 22px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
-        #status-msg { margin-top: 20px; font-weight: bold; }
+        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; font-size: 1rem; }
     </style>
 </head>
 <body>
+
     <div class="card">
         <h1>SafeZone</h1>
         <p>דווח מצבך למוקד המבצעי</p>
+        
         <input type="text" id="userName" placeholder="שם מלא">
         <input type="tel" id="userPhone" placeholder="מספר טלפון">
+
         <div class="btn-grid">
             <button class="emergency-btn red" onclick="sendReport('זקוק לעזרה')">🆘 זקוק לעזרה</button>
             <button class="emergency-btn orange" onclick="sendReport('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
             <button class="emergency-btn green" onclick="sendReport('בטוח במקלט')">✅ אני בטוח</button>
         </div>
+
         <div id="status-msg"></div>
     </div>
+
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
             projectId: "safezone-cd4b5",
+            storageBucket: "safezone-cd4b5.firebasestorage.app",
+            messagingSenderId: "78949340231",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // טעינת פרטים שמורים מהזיכרון של המכשיר
+        window.onload = () => {
+            const savedName = localStorage.getItem('safezone_name');
+            const savedPhone = localStorage.getItem('safezone_phone');
+            if (savedName) document.getElementById('userName').value = savedName;
+            if (savedPhone) document.getElementById('userPhone').value = savedPhone;
+        };
+
         async function sendReport(status) {
             const msg = document.getElementById('status-msg');
             const name = document.getElementById('userName').value;
-            if (!name) { alert("חובה להזין שם"); return; }
-            msg.innerText = "מאתר מיקום... 📡";
+            const phone = document.getElementById('userPhone').value;
             
+            if (!name) { alert("חובה להזין שם"); return; }
+            
+            // שמירת הפרטים לשימוש הבא
+            localStorage.setItem('safezone_name', name);
+            localStorage.setItem('safezone_phone', phone);
+
+            msg.innerText = "מאתר מיקום ושולח... 📡";
+            msg.style.color = "blue";
+
+            if (!navigator.geolocation) {
+                msg.innerText = "❌ הדפדפן לא תומך במיקום";
+                return;
+            }
+
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                await db.collection("reports").add({
-                    name: name,
-                    phone: document.getElementById('userPhone').value || "לא צוין",
-                    status: status,
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude,
-                    time: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                msg.innerText = "✅ הדיווח התקבל!";
-                msg.style.color = "green";
-            }, (err) => { msg.innerText = "❌ חובה לאשר מיקום!"; });
+                try {
+                    await db.collection("reports").add({
+                        name: name,
+                        phone: phone || "לא צוין",
+                        status: status,
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        time: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    msg.innerText = "✅ הדיווח התקבל בחמ\"ל!";
+                    msg.style.color = "green";
+                } catch (e) {
+                    msg.innerText = "❌ שגיאת שרת: " + e.message;
+                    msg.style.color = "red";
+                }
+            }, (err) => {
+                let errorDesc = "שגיאת מיקום";
+                if (err.code === 1) errorDesc = "חובה לאשר גישה למיקום!";
+                if (err.code === 3) errorDesc = "זמן האיתור תם (נסה שוב)";
+                msg.innerText = "❌ " + errorDesc;
+                msg.style.color = "red";
+            }, {
+                enableHighAccuracy: true,
+                timeout: 15000, // מחכה מקסימום 15 שניות
+                maximumAge: 0
+            });
         }
     </script>
 </body>
