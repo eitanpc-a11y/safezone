@@ -3,80 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SafeZone - מערכת ניהול</title>
-    
+    <title>SafeZone - דיווח חירום</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f7f9;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            color: #333;
-        }
-        .container {
-            width: 90%;
-            max-width: 400px;
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        h1 { color: #1a73e8; }
-        .status {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .success { background-color: #e6f4ea; color: #1e8e3e; }
-        .error { background-color: #fce8e6; color: #d93025; }
+        :root { --red: #d32f2f; --green: #388e3c; --orange: #f57c00; }
+        body { font-family: system-ui, sans-serif; background: #f4f7f9; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 90%; max-width: 400px; text-align: center; }
+        h1 { color: var(--red); font-size: 2.2rem; margin-bottom: 5px; }
+        input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1.1rem; text-align: center; }
+        .btn-grid { display: grid; gap: 12px; margin-top: 10px; }
+        .emergency-btn { padding: 22px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
+        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; }
     </style>
 </head>
 <body>
-
-    <div class="container">
+    <div class="card">
         <h1>SafeZone</h1>
-        <p>מערכת ה-Firebase מאותחלת כעת...</p>
-        <div id="connection-status" class="status">מתחבר לשרת...</div>
+        <p>דווח מצבך למוקד המבצעי</p>
+        <input type="text" id="userName" placeholder="שם מלא">
+        <input type="tel" id="userPhone" placeholder="מספר טלפון">
+        <div class="btn-grid">
+            <button class="emergency-btn red" onclick="sendReport('זקוק לעזרה')">🆘 זקוק לעזרה</button>
+            <button class="emergency-btn orange" onclick="sendReport('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
+            <button class="emergency-btn green" onclick="sendReport('בטוח במקלט')">✅ אני בטוח</button>
+        </div>
+        <div id="status-msg"></div>
     </div>
-
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
     <script>
-        // הגדרות ה-Firebase המעודכנות שלך
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
             projectId: "safezone-cd4b5",
             storageBucket: "safezone-cd4b5.firebasestorage.app",
             messagingSenderId: "78949340231",
-            appId: "1:78949340231:web:85929f70752f1fc7cf8d62",
-            measurementId: "G-DYT4ZHEN92"
+            appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-        // אתחול Firebase
-        try {
-            firebase.initializeApp(firebaseConfig);
-            if ("measurementId" in firebaseConfig) {
-                firebase.analytics();
-            }
+        async function sendReport(status) {
+            const msg = document.getElementById('status-msg');
+            const name = document.getElementById('userName').value;
+            if (!name) { alert("חובה להזין שם"); return; }
+            msg.innerText = "שולח מיקום... 📡";
             
-            document.getElementById('connection-status').innerText = "✅ Firebase מחובר בהצלחה!";
-            document.getElementById('connection-status').classList.add('success');
-            console.log("Firebase initialized successfully for SafeZone");
-            
-        } catch (error) {
-            document.getElementById('connection-status').innerText = "❌ שגיאה בחיבור: " + error.message;
-            document.getElementById('connection-status').classList.add('error');
-            console.error("Firebase initialization error:", error);
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                await db.collection("reports").add({
+                    name: name,
+                    phone: document.getElementById('userPhone').value || "לא צוין",
+                    status: status,
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    time: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                msg.innerText = "✅ הדיווח התקבל בחמ\"ל!";
+                msg.style.color = "green";
+            }, (err) => { msg.innerText = "❌ חובה לאשר מיקום!"; msg.style.color = "red"; }, {timeout: 10000});
         }
     </script>
 </body>
