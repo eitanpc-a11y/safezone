@@ -4,115 +4,107 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SafeZone - ניטור ודיווח</title>
+    <link rel="manifest" href="manifest.json">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
     <style>
         :root { --red: #d32f2f; --orange: #f57c00; --green: #388e3c; --dark: #121212; }
         body { font-family: system-ui, sans-serif; background: var(--dark); color: white; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         .container { width: 100%; max-width: 400px; text-align: center; }
-        
-        /* מסך המתנה */
-        #standby-screen { display: block; padding-top: 60px; }
-        .monitor-icon { font-size: 3rem; margin-bottom: 20px; color: #444; }
-
-        /* תפריט דיווח (מוסתר) */
-        .card { background: #1e1e1e; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; border: 1px solid #333; }
-        
+        #standby-screen { display: block; padding-top: 40px; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 25px; display: none; border: 1px solid #333; }
         input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 1.1rem; box-sizing: border-box; text-align: center; }
         .btn { width: 100%; padding: 22px; margin: 10px 0; border: none; border-radius: 18px; color: white; font-weight: bold; font-size: 1.4rem; cursor: pointer; }
-        .btn-red { background: var(--red); } 
-        .btn-orange { background: var(--orange); } 
-        .btn-green { background: var(--green); }
-        
-        #alert-header { display: none; background: var(--red); color: white; padding: 15px; border-radius: 15px; margin-bottom: 20px; font-weight: bold; font-size: 1.2rem; }
+        .btn-red { background: var(--red); } .btn-orange { background: var(--orange); } .btn-green { background: var(--green); }
+        .push-btn { background: #444; color: #fff; padding: 10px; border-radius: 10px; border: 1px solid #555; margin-top: 20px; cursor: pointer; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <div id="standby-screen">
-            <div class="monitor-icon">🛡️</div>
+            <div style="font-size: 3rem; margin-bottom: 10px;">🛡️</div>
             <h2>SafeZone במצב ניטור</h2>
-            <p style="color: #666;">המערכת ממתינה לאזעקה ביישוב שלך...</p>
             <input type="text" id="userName" placeholder="שם מלא">
             <input type="text" id="userCity" placeholder="הכנס עיר (למשל: תל אביב)">
-            <p style="font-size: 0.8rem; color: #444;">השאר את הלשונית פתוחה כדי שהתפריט יקפוץ</p>
-            <button onclick="triggerEmergency()" style="background:none; border:1px solid #333; color:#444; padding:5px; border-radius:5px; margin-top:20px; cursor:pointer;">בדיקת הקפצה ויזואלית</button>
+            <button class="push-btn" onclick="requestPushPermission()">🔔 הפעל התראות כשהאפליקציה סגורה</button>
+            <p style="font-size: 0.8rem; color: #666; margin-top: 20px;">מומלץ: "הוסף למסך הבית" לתפקוד מלא</p>
         </div>
 
         <div id="emergency-menu" class="card">
-            <div id="alert-header">⚠️ זוהתה אזעקה ביישוב שלך!</div>
+            <div style="background:var(--red); padding:10px; border-radius:10px; margin-bottom:15px; font-weight:bold;">⚠️ אזעקה ביישוב שלך!</div>
             <button class="btn btn-red" onclick="report('זקוק לעזרה')">🆘 זקוק לעזרה</button>
-            <button class="btn btn-orange" onclick="report('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
+            <button class="btn btn-orange" onclick="report('בדרך למקלט')">🏃 בדרך למקלט</button>
             <button class="btn btn-green" onclick="report('בטוח במקלט')">✅ אני בטוח</button>
             <div id="status-msg" style="margin-top:15px; font-weight:bold;"></div>
         </div>
     </div>
 
     <script>
-        // הגדרות Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
             projectId: "safezone-cd4b5",
+            messagingSenderId: "78949340231",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const messaging = firebase.messaging();
+
+        // בקשת אישור ל-Push והרשמה
+        async function requestPushPermission() {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                const token = await messaging.getToken({ vapidKey: 'gyKZFrNtLB3we67OY8_iohg6h9TtmRBlpMP1bj1DY_k' });
+                if (token) {
+                    await db.collection("tokens").doc(token).set({
+                        city: document.getElementById('userCity').value,
+                        name: document.getElementById('userName').value
+                    });
+                    alert("התראות הופעלו בהצלחה!");
+                }
+            }
+        }
 
         window.onload = () => {
             document.getElementById('userName').value = localStorage.getItem('sz_name') || "";
             document.getElementById('userCity').value = localStorage.getItem('sz_city') || "";
-            // בדיקת אזעקות כל 3 שניות
-            setInterval(fetchAlerts, 3000);
+            
+            // אם המשתמש הגיע דרך לחיצה על התראה
+            if (new URLSearchParams(window.location.search).get('alert') === 'true') {
+                triggerEmergency();
+            }
+            setInterval(fetchAlerts, 4000);
         };
 
-        // פונקציית בדיקת אזעקות מול שרת חיצוני
         async function fetchAlerts() {
             const city = document.getElementById('userCity').value;
             if (!city) return;
-
             try {
                 const res = await fetch('https://api.cumta.co.il/alertsActive.json');
                 const data = await res.json();
-                
-                // אם העיר שלך מופיעה ברשימת האזעקות הפעילות
-                if (data.cities && data.cities.includes(city)) {
-                    triggerEmergency();
-                }
-            } catch (e) { /* התעלמות משגיאות רשת שקטות */ }
+                if (data.cities && data.cities.includes(city)) triggerEmergency();
+            } catch (e) {}
         }
 
-        // פונקציית ה"הקפצה" - עוברת למסך הכפתורים
         function triggerEmergency() {
             document.getElementById('standby-screen').style.display = 'none';
             document.getElementById('emergency-menu').style.display = 'block';
-            document.getElementById('alert-header').style.display = 'block';
-            
-            // רטט חלש כדי שתדע שהמסך התחלף אם הטלפון ביד
-            if (navigator.vibrate) navigator.vibrate(500);
         }
 
         async function report(status) {
             const name = document.getElementById('userName').value;
-            if (!name) return alert("הכנס שם");
-            
             localStorage.setItem('sz_name', name);
             localStorage.setItem('sz_city', document.getElementById('userCity').value);
-
-            const msg = document.getElementById('status-msg');
-            msg.innerText = "שולח דיווח... 📡";
-
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await db.collection("reports").add({
-                    name: name,
-                    status: status,
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude,
+                    name, status, lat: pos.coords.latitude, lng: pos.coords.longitude,
                     time: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                msg.innerHTML = "<span style='color:var(--green)'>✅ נשלח בהצלחה!</span>";
-            }, (err) => { alert("שגיאת מיקום. וודא GPS פועל."); }, { timeout: 8000 });
+                document.getElementById('status-msg').innerHTML = "✅ נשלח!";
+            });
         }
     </script>
 </body>
