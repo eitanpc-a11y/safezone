@@ -22,6 +22,7 @@
         .btn { width: 100%; padding: 22px; margin: 10px 0; border: none; border-radius: 18px; color: white; font-weight: bold; font-size: 1.4rem; cursor: pointer; }
         .btn-red { background: var(--red); } .btn-orange { background: var(--orange); } .btn-green { background: var(--green); }
         .push-btn { background: #444; color: #fff; padding: 12px; border-radius: 10px; border: 1px solid #555; margin-top: 20px; cursor: pointer; width: 100%; }
+        #debug-msg { font-size: 0.8rem; color: #666; margin-top: 20px; }
         #manual-map-container { display: none; margin-top: 20px; }
         #map-picker { height: 250px; border-radius: 15px; border: 2px solid #444; margin-bottom: 10px; }
     </style>
@@ -35,7 +36,8 @@
             <input type="text" id="userName" placeholder="שם מלא">
             <input type="text" id="userCity" placeholder="עיר (למשל: תל אביב)">
             <button class="push-btn" id="push-btn" onclick="requestPushPermission()">🔔 הפעל התראות Push</button>
-            <p id="debug-msg" style="font-size: 0.8rem; color: #666; margin-top: 20px;">יש להוסיף למסך הבית כדי לאפשר התראות</p>
+            <p id="debug-msg">יש להוסיף למסך הבית כדי לאפשר התראות</p>
+            <button onclick="triggerEmergency()" style="margin-top:20px; background:none; border:none; color:#444; text-decoration:underline;">בדיקה ידנית</button>
         </div>
 
         <div id="emergency-menu" class="card">
@@ -67,43 +69,37 @@
 
         let manualMap, manualMarker, currentStatus, selLat = 32.0853, selLng = 34.7818;
 
-        // מנגנון בקשת התראות משופר לאייפון
         async function requestPushPermission() {
             const debug = document.getElementById('debug-msg');
             try {
-                debug.innerText = "מבקש הרשאה מהמכשיר...";
+                debug.innerText = "מבקש הרשאה...";
                 const permission = await Notification.requestPermission();
                 
                 if (permission === 'granted') {
-                    debug.innerText = "הרשאה ניתנה. רושם Service Worker...";
+                    debug.innerText = "הרשאה ניתנה. רושם מערכת...";
                     
-                    // רישום מפורש של ה-Service Worker (קריטי לאייפון)
-                    const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+                    // רישום Service Worker מפורש עבור iOS
+                    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
                     
-                    debug.innerText = "מקבל טוקן מ-Google...";
+                    debug.innerText = "מתחבר לשרת ההתראות...";
                     const token = await messaging.getToken({ 
-                        vapidKey: 'gyKZFrNtLB3we67OY8_iohg6h9TtmRBlpMP1bj1DY_k',
-                        serviceWorkerRegistration: registration 
+                        vapidKey: 'BMZ7U-clgjwA9J6oooT-wDLWKZP-PBXWI-Nm3ceOU2qsoeIGKWGgeSMeMaquGyLhpMwpV-zMDNOiqdXmeZGo',
+                        serviceWorkerRegistration: reg
                     });
 
                     if (token) {
                         await db.collection("tokens").doc(token).set({
                             city: document.getElementById('userCity').value,
                             name: document.getElementById('userName').value,
-                            device: "iOS/PWA",
                             updated: firebase.firestore.FieldValue.serverTimestamp()
                         });
                         alert("התראות הופעלו בהצלחה!");
-                        document.getElementById('push-btn').innerText = "🔔 התראות פעילות";
-                        document.getElementById('push-btn').disabled = true;
+                        document.getElementById('push-btn').innerText = "✅ התראות פעילות";
                     }
-                } else {
-                    alert("לא ניתן אישור להתראות. שנה זאת בהגדרות האפליקציה.");
                 }
             } catch (e) {
-                console.error(e);
                 debug.innerText = "שגיאה: " + e.message;
-                alert("שגיאה טכנית: " + e.message + "\nוודא שהעתקת את ה-VAPID KEY במלואו.");
+                alert("שגיאה ברישום: " + e.message);
             }
         }
 
@@ -134,7 +130,8 @@
             currentStatus = status;
             localStorage.setItem('sz_name', document.getElementById('userName').value);
             localStorage.setItem('sz_city', document.getElementById('userCity').value);
-            document.getElementById('status-msg').innerText = "מאתר מיקום...";
+            document.getElementById('status-msg').innerText = "מזהה מיקום...";
+            
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 if (Math.floor(pos.coords.latitude) === 53 || Math.floor(pos.coords.latitude) === 33) {
                     showManualMap();
