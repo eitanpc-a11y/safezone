@@ -1,31 +1,64 @@
-// החלף רק את הפונקציה onSnapshot בתוך קובץ ה-admin.html הקיים:
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>חמ"ל SafeZone - ניהול</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; display: flex; height: 100vh; font-family: system-ui; }
+        #sidebar { width: 350px; background: #222; color: white; overflow-y: auto; padding: 15px; box-sizing: border-box; }
+        #map { flex-grow: 1; height: 100%; }
+        .report-item { background: #333; padding: 10px; margin-bottom: 10px; border-radius: 8px; border-right: 5px solid #666; }
+        .status-red { border-right-color: #ff5252; }
+        .status-green { border-right-color: #4caf50; }
+        h2 { border-bottom: 1px solid #444; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>דיווחים אחרונים</h2>
+        <div id="reports-list">ממתין לנתונים...</div>
+    </div>
+    <div id="map"></div>
 
-onSnapshot(collection(db, "reports"), (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-            const d = change.doc.data();
-            
-            // צבע לפי סטטוס
-            let color = 'orange';
-            if (d.status === 'זקוק לעזרה') color = 'red';
-            if (d.status === 'בטוח במקלט') color = 'green';
-            
-            // הוספת הנקודה למפה
-            const marker = L.circleMarker([d.lat, d.lng], { 
-                color: color, 
-                radius: 12, 
-                fillOpacity: 0.9 
-            }).addTo(map)
-             .bindPopup(`<b>${d.name}</b><br>מצב: ${d.status}`);
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-            // פקודה חדשה: קפוץ למיקום הדיווח החדש באופן אוטומטי
-            map.setView([d.lat, d.lng], 12);
-            marker.openPopup();
+        const firebaseConfig = {
+            apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
+            authDomain: "safezone-cd4b5.firebaseapp.com",
+            projectId: "safezone-cd4b5",
+            appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-            // התראה קולית אם זה חירום
-            if (d.status === 'זקוק לעזרה') {
-                audio.play();
-            }
-        }
-    });
-});
+        const map = L.map('map').setView([32.0853, 34.7818], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        const listDiv = document.getElementById('reports-list');
+        const q = query(collection(db, "reports"), orderBy("time", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            listDiv.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const d = doc.data();
+                const color = d.status === 'זקוק לעזרה' ? 'red' : 'green';
+                const time = d.time ? d.time.toDate().toLocaleTimeString('he-IL') : 'עכשיו';
+
+                // הוספה למפה
+                L.circleMarker([d.lat, d.lng], { color: color, radius: 10, fillOpacity: 0.8 }).addTo(map)
+                 .bindPopup(`<b>${d.name}</b><br>${d.status}`);
+
+                // הוספה לטבלה בצד
+                const item = document.createElement('div');
+                item.className = `report-item status-${color === 'red' ? 'red' : 'green'}`;
+                item.innerHTML = `<strong>${d.name}</strong><br>${d.status}<br><small>${time} | ${d.phone}</small>`;
+                listDiv.appendChild(item);
+            });
+        });
+    </script>
+</body>
+</html>
