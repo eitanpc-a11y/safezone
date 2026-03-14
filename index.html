@@ -34,8 +34,8 @@
             <h2>SafeZone במצב ניטור</h2>
             <input type="text" id="userName" placeholder="שם מלא">
             <input type="text" id="userCity" placeholder="עיר (למשל: תל אביב)">
-            <button class="push-btn" onclick="requestPushPermission()">🔔 הפעל התראות Push</button>
-            <p style="font-size: 0.8rem; color: #444; margin-top: 20px;">יש להוסיף למסך הבית למניעת שגיאות</p>
+            <button class="push-btn" id="push-btn" onclick="requestPushPermission()">🔔 הפעל התראות Push</button>
+            <p id="debug-msg" style="font-size: 0.8rem; color: #666; margin-top: 20px;">יש להוסיף למסך הבית כדי לאפשר התראות</p>
         </div>
 
         <div id="emergency-menu" class="card">
@@ -67,21 +67,44 @@
 
         let manualMap, manualMarker, currentStatus, selLat = 32.0853, selLng = 34.7818;
 
+        // מנגנון בקשת התראות משופר לאייפון
         async function requestPushPermission() {
+            const debug = document.getElementById('debug-msg');
             try {
+                debug.innerText = "מבקש הרשאה מהמכשיר...";
                 const permission = await Notification.requestPermission();
+                
                 if (permission === 'granted') {
-                    const token = await messaging.getToken({ vapidKey: 'gyKZFrNtLB3we67OY8_iohg6h9TtmRBlpMP1bj1DY_k' });
+                    debug.innerText = "הרשאה ניתנה. רושם Service Worker...";
+                    
+                    // רישום מפורש של ה-Service Worker (קריטי לאייפון)
+                    const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+                    
+                    debug.innerText = "מקבל טוקן מ-Google...";
+                    const token = await messaging.getToken({ 
+                        vapidKey: 'gyKZFrNtLB3we67OY8_iohg6h9TtmRBlpMP1bj1DY_k',
+                        serviceWorkerRegistration: registration 
+                    });
+
                     if (token) {
                         await db.collection("tokens").doc(token).set({
                             city: document.getElementById('userCity').value,
                             name: document.getElementById('userName').value,
+                            device: "iOS/PWA",
                             updated: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                        alert("התראות הופעלו!");
+                        alert("התראות הופעלו בהצלחה!");
+                        document.getElementById('push-btn').innerText = "🔔 התראות פעילות";
+                        document.getElementById('push-btn').disabled = true;
                     }
+                } else {
+                    alert("לא ניתן אישור להתראות. שנה זאת בהגדרות האפליקציה.");
                 }
-            } catch (e) { alert("שגיאה: וודא שהוספת את האתר למסך הבית."); }
+            } catch (e) {
+                console.error(e);
+                debug.innerText = "שגיאה: " + e.message;
+                alert("שגיאה טכנית: " + e.message + "\nוודא שהעתקת את ה-VAPID KEY במלואו.");
+            }
         }
 
         window.onload = () => {
