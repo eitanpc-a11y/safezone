@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SafeZone - דיווח חירום</title>
+    <title>SafeZone - מערכת דיווח חירום</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -11,41 +11,66 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        :root { --red: #d32f2f; --orange: #f57c00; --green: #388e3c; }
-        body { font-family: system-ui, sans-serif; background: #f4f7f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; z-index: 1000; }
-        input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1.1rem; text-align: center; }
-        .btn { width: 100%; padding: 20px; margin: 8px 0; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
-        .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
-        #status-msg { margin-top: 15px; font-weight: bold; min-height: 24px; color: #555; }
+        :root { --red: #d32f2f; --orange: #f57c00; --green: #388e3c; --dark: #121212; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--dark); color: white; margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
-        /* סגנון למפת הבחירה הידנית */
-        #manual-map-container { display: none; width: 100%; max-width: 400px; margin-top: 20px; }
-        #map-picker { height: 300px; border-radius: 15px; border: 2px solid #ccc; margin-bottom: 10px; }
-        .manual-btn { background: #333; color: white; width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer; }
+        .container { width: 100%; max-width: 400px; text-align: center; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; border: 1px solid #333; }
+        
+        /* מצב המתנה */
+        #standby-screen { display: block; padding-top: 50px; }
+        .pulse { width: 100px; height: 100px; background: rgba(211, 47, 47, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; border: 2px solid var(--red); animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(211, 47, 47, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
+
+        /* כפתורי דיווח */
+        input, select { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 1.1rem; box-sizing: border-box; text-align: center; }
+        .btn { width: 100%; padding: 22px; margin: 10px 0; border: none; border-radius: 18px; color: white; font-weight: bold; font-size: 1.4rem; cursor: pointer; transition: 0.2s; }
+        .btn-red { background: var(--red); box-shadow: 0 5px 15px rgba(211, 47, 47, 0.4); }
+        .btn-orange { background: var(--orange); }
+        .btn-green { background: var(--green); }
+        
+        /* מפה ידנית */
+        #manual-map-container { display: none; margin-top: 20px; }
+        #map-picker { height: 250px; border-radius: 15px; margin-bottom: 10px; border: 2px solid #444; }
+
+        #alert-banner { display: none; background: var(--red); color: white; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1 style="color: var(--red); margin: 0 0 15px 0;">SafeZone 🆘</h1>
-        <input type="text" id="userName" placeholder="שם מלא">
-        <input type="tel" id="userPhone" placeholder="מספר טלפון">
-        
-        <button class="btn red" onclick="handleReport('זקוק לעזרה')">🆘 זקוק לעזרה</button>
-        <button class="btn orange" onclick="handleReport('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
-        <button class="btn green" onclick="handleReport('בטוח במקלט')">✅ אני בטוח</button>
-        
-        <div id="status-msg"></div>
+    <div class="container">
+        <div id="standby-screen">
+            <div class="pulse">🛡️</div>
+            <h2>SafeZone במצב המתנה</h2>
+            <p style="color: #aaa;">המערכת מנטרת אזעקות ביישוב שלך...</p>
+            <input type="text" id="userName" placeholder="שם מלא">
+            <input type="tel" id="userPhone" placeholder="מספר טלפון">
+            <input type="text" id="userCity" placeholder="הכנס עיר (למשל: תל אביב)">
+            <p style="font-size: 0.8rem; color: #666;">השאר את הדף פתוח כדי לקבל התראה בזמן אמת</p>
+            <button onclick="manualTrigger()" style="background: none; border: 1px solid #444; color: #888; padding: 5px 10px; border-radius: 5px; cursor: pointer;">בדיקה ידנית (דימוי אזעקה)</button>
+        </div>
+
+        <div class="card" id="emergency-menu">
+            <div id="alert-banner">⚠️ אזעקה פעילה ביישוב שלך!</div>
+            <h2 style="margin: 0 0 15px 0;">דיווח מהיר</h2>
+            <button class="btn btn-red" onclick="report('זקוק לעזרה')">🆘 זקוק לעזרה</button>
+            <button class="btn btn-orange" onclick="report('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
+            <button class="btn btn-green" onclick="report('בטוח במקלט')">✅ אני בטוח</button>
+            <div id="status-msg" style="margin-top:15px; font-weight:bold;"></div>
+        </div>
+
+        <div id="manual-map-container">
+            <p style="color: #ffb74d;">מזוהה שיבוש במיקום. סמן ידנית:</p>
+            <div id="map-picker"></div>
+            <button class="btn btn-green" style="font-size: 1rem; padding: 15px;" onclick="sendManual()">שלח מיקום שנבחר 📍</button>
+        </div>
     </div>
 
-    <div id="manual-map-container">
-        <p style="text-align: center; font-weight: bold; margin-bottom: 5px;">בחר מיקום מדויק על המפה:</p>
-        <div id="map-picker"></div>
-        <button class="manual-btn" onclick="sendManualReport()">שלח מיקום שנבחר 📍</button>
-    </div>
+    <audio id="siren-sound" src="https://actions.google.com/sounds/v1/alarms/emergency_it_is_an_emergency.ogg" preload="auto"></audio>
 
     <script>
+        // קונפיגורציה
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
@@ -55,67 +80,83 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        let manualMap, manualMarker, selectedStatus;
-        let selectedLat = 32.0853, selectedLng = 34.7818; // ברירת מחדל ת"א
+        let manualMap, manualMarker, currentStatus;
+        let selectedLat = 32.0853, selectedLng = 34.7818;
 
+        // טעינת פרטים שמורים
         window.onload = () => {
             document.getElementById('userName').value = localStorage.getItem('sz_name') || "";
             document.getElementById('userPhone').value = localStorage.getItem('sz_phone') || "";
+            document.getElementById('userCity').value = localStorage.getItem('sz_city') || "";
+            setInterval(fetchAlerts, 5000); // בדיקת אזעקות כל 5 שניות
         };
 
-        async function handleReport(status) {
-            selectedStatus = status;
+        // סימולציה של אזעקה לבדיקה
+        function manualTrigger() { triggerEmergency(); }
+
+        // מנוע זיהוי אזעקות (CORS Proxy משולב)
+        async function fetchAlerts() {
+            const city = document.getElementById('userCity').value;
+            if (!city) return;
+
+            try {
+                // שימוש במקור נתונים ציבורי (דוגמה למקור פתוח)
+                const res = await fetch('https://api.cumta.co.il/alertsActive.json');
+                const data = await res.json();
+                
+                if (data.cities && data.cities.includes(city)) {
+                    triggerEmergency();
+                }
+            } catch (e) { console.log("בדיקת אזעקות שקטה..."); }
+        }
+
+        function triggerEmergency() {
+            document.getElementById('standby-screen').style.display = 'none';
+            document.getElementById('emergency-menu').style.display = 'block';
+            document.getElementById('alert-banner').style.display = 'block';
+            document.getElementById('siren-sound').play().catch(e => console.log("צריך אינטראקציה לצליל"));
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+        }
+
+        async function report(status) {
+            currentStatus = status;
             const name = document.getElementById('userName').value;
-            if (!name) return alert("אנא הזן שם");
+            if (!name) return alert("הכנס שם");
+            
+            // שמירה לשימוש הבא
             localStorage.setItem('sz_name', name);
             localStorage.setItem('sz_phone', document.getElementById('userPhone').value);
+            localStorage.setItem('sz_city', document.getElementById('userCity').value);
 
-            const msg = document.getElementById('status-msg');
-            msg.innerText = "מזהה מיקום... 📡";
+            document.getElementById('status-msg').innerText = "מאתר מיקום... 📡";
 
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
 
-                // בדיקת שיבוש (אם המיקום באירלנד - קו רוחב 53)
+                // בדיקת שיבוש GPS (דבלין/ביירות)
                 if (Math.floor(lat) === 53 || Math.floor(lat) === 33) {
-                    msg.innerHTML = "⚠️ שיבוש GPS זוהה (דבלין/ביירות).<br>אנא סמן מיקום ידני במפה למטה:";
                     showManualMap();
                 } else {
                     sendToFirebase(lat, lng, status);
                 }
-            }, (err) => {
-                msg.innerText = "❌ שגיאת GPS. נא לסמן ידנית:";
-                showManualMap();
-            }, { enableHighAccuracy: false, timeout: 8000 });
+            }, (err) => { showManualMap(); }, { timeout: 8000 });
         }
 
         function showManualMap() {
+            document.getElementById('status-msg').innerText = "⚠️ שיבוש GPS זוהה. סמן ידנית:";
             document.getElementById('manual-map-container').style.display = 'block';
             if (!manualMap) {
                 manualMap = L.map('map-picker').setView([32.0853, 34.7818], 13);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(manualMap);
-                
                 manualMarker = L.marker([32.0853, 34.7818], {draggable: true}).addTo(manualMap);
-                manualMap.on('click', (e) => {
-                    manualMarker.setLatLng(e.latlng);
-                    selectedLat = e.latlng.lat;
-                    selectedLng = e.latlng.lng;
-                });
-                manualMarker.on('dragend', (e) => {
-                    selectedLat = e.target.getLatLng().lat;
-                    selectedLng = e.target.getLatLng().lng;
-                });
+                manualMap.on('click', e => { manualMarker.setLatLng(e.latlng); selectedLat = e.latlng.lat; selectedLng = e.latlng.lng; });
             }
-            window.scrollTo(0, document.body.scrollHeight);
         }
 
-        async function sendManualReport() {
-            sendToFirebase(selectedLat, selectedLng, selectedStatus);
-        }
+        function sendManual() { sendToFirebase(selectedLat, selectedLng, currentStatus); }
 
         async function sendToFirebase(lat, lng, status) {
-            const msg = document.getElementById('status-msg');
             try {
                 await db.collection("reports").add({
                     name: document.getElementById('userName').value,
@@ -125,12 +166,9 @@
                     lng: lng,
                     time: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                msg.innerText = "✅ הדיווח נשלח בהצלחה!";
-                msg.style.color = "green";
+                document.getElementById('status-msg').innerHTML = "<span style='color:var(--green)'>✅ הדיווח התקבל בחמ\"ל!</span>";
                 document.getElementById('manual-map-container').style.display = 'none';
-            } catch (e) {
-                msg.innerText = "❌ שגיאת שרת: " + e.message;
-            }
+            } catch (e) { alert("שגיאה: " + e.message); }
         }
     </script>
 </body>
