@@ -2,70 +2,60 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>חמ"ל SafeZone - ניהול מבצעי</title>
+    <title>חמ"ל SafeZone - ניהול</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: system-ui; }
+        body { margin: 0; font-family: system-ui; }
         #map { height: 100vh; width: 100%; display: none; }
-        #login { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f0f2f5; }
-        .login-box { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
-        input { padding: 15px; font-size: 1.2rem; margin-bottom: 10px; border-radius: 10px; border: 1px solid #ccc; width: 250px; text-align: center; }
-        button { padding: 12px 30px; background: #d32f2f; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        #login { height: 100vh; display: flex; align-items: center; justify-content: center; background: #222; color: white; }
+        .login-box { text-align: center; background: #333; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        input { padding: 15px; margin: 10px; border-radius: 8px; border: none; font-size: 1.2rem; text-align: center; }
+        button { padding: 15px 30px; background: #d32f2f; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="login">
         <div class="login-box">
-            <h2>כניסת מנהל צוות</h2>
-            <input type="password" id="pass" placeholder="קוד גישה (1234)">
+            <h2>כניסת מפקד צוות</h2>
+            <input type="password" id="pass" placeholder="קוד גישה">
             <br>
-            <button onclick="checkPass()">כניסה למערכת</button>
+            <button onclick="checkPass()">כניסה למפה</button>
         </div>
     </div>
-
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
             projectId: "safezone-cd4b5",
-            storageBucket: "safezone-cd4b5.firebasestorage.app",
-            messagingSenderId: "78949340231",
-            appId: "1:78949340231:web:85929f70752f1fc7cf8d62",
-            measurementId: "G-DYT4ZHEN92"
+            appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
-
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         window.checkPass = () => {
-            const p = document.getElementById('pass').value;
-            if(p === "1234") {
+            if(document.getElementById('pass').value === "1234") {
                 document.getElementById('login').style.display = 'none';
                 document.getElementById('map').style.display = 'block';
-                loadMap();
+                initMap();
             } else { alert("קוד שגוי"); }
-        }
+        };
 
-        function loadMap() {
-            const map = L.map('map').setView([32.0853, 34.7818], 10);
+        function initMap() {
+            const map = L.map('map').setView([32.0853, 34.7818], 9);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-            const q = query(collection(db, "reports"), orderBy("time", "desc"), limit(100));
-            onSnapshot(q, (snap) => {
-                snap.docChanges().forEach(change => {
+            onSnapshot(collection(db, "reports"), (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
                         const d = change.doc.data();
-                        let color = 'orange';
-                        if (d.status === 'זקוק לעזרה') color = 'red';
-                        if (d.status === 'בטוח במקלט') color = 'green';
-                        
-                        L.circleMarker([d.lat, d.lng], { color: color, radius: 10, fillOpacity: 0.8 }).addTo(map)
+                        const color = d.status === 'זקוק לעזרה' ? 'red' : (d.status === 'בטוח במקלט' ? 'green' : 'orange');
+                        L.circleMarker([d.lat, d.lng], { color: color, radius: 12, fillOpacity: 0.9 }).addTo(map)
                          .bindPopup(`<b>${d.name}</b><br>מצב: ${d.status}<br>טלפון: ${d.phone}`);
                     }
                 });
