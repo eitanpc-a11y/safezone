@@ -2,39 +2,50 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>חמ"ל SafeZone - ניהול מבצעי</title>
+    <title>חמ"ל SafeZone - מרכז שליטה</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; display: flex; height: 100vh; font-family: system-ui, sans-serif; background: #1a1a1a; }
-        #sidebar { width: 350px; background: #222; color: white; overflow-y: auto; padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid #444; }
+        body { margin: 0; display: flex; height: 100vh; font-family: system-ui, sans-serif; background: #1a1a1a; color: white; }
+        #sidebar { width: 380px; background: #222; display: flex; flex-direction: column; border-left: 1px solid #444; }
         #map { flex-grow: 1; height: 100%; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-bottom: 15px; }
-        .clear-btn { background: #444; color: #ff5252; border: 1px solid #ff5252; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: 0.3s; }
-        .clear-btn:hover { background: #ff5252; color: white; }
+        .stats-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background: #2a2a2a; border-bottom: 1px solid #444; }
+        .stat-card { padding: 10px; border-radius: 8px; text-align: center; }
+        .stat-red { background: rgba(255, 82, 82, 0.2); border: 1px solid #ff5252; color: #ff5252; }
+        .stat-green { background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; color: #4caf50; }
 
-        .report-item { background: #333; padding: 12px; margin-bottom: 10px; border-radius: 8px; border-right: 5px solid #666; animation: fadeIn 0.5s ease; }
-        .status-red { border-right-color: #ff5252; background: rgba(255, 82, 82, 0.1); }
-        .status-green { border-right-color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+        .report-item { background: #333; padding: 12px; margin: 10px; border-radius: 10px; position: relative; border-right: 5px solid #666; }
+        .status-red { border-right-color: #ff5252; }
+        .status-orange { border-right-color: #ff9800; }
+        .status-green { border-right-color: #4caf50; }
+
+        .btn-row { display: flex; gap: 5px; margin-top: 10px; }
+        .action-btn { flex: 1; padding: 8px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .btn-waze { background: #33ccff; color: #000; }
+        .btn-sms { background: #ff9800; color: #000; }
         
-        @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
-        small { color: #aaa; }
+        .header-tools { padding: 10px 15px; display: flex; justify-content: space-between; }
+        #reports-list { overflow-y: auto; flex-grow: 1; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <div class="header">
-            <h2 style="margin:0">דיווחים חיה</h2>
-            <button class="clear-btn" onclick="clearAllReports()">🗑️ ניקוי חמ"ל</button>
+        <div class="stats-bar">
+            <div class="stat-card stat-red">🚑 דרוש סיוע: <span id="count-red">0</span></div>
+            <div class="stat-card stat-green">✅ בטוחים: <span id="count-green">0</span></div>
         </div>
-        <div id="reports-list">טוען נתונים...</div>
+        <div class="header-tools">
+            <button onclick="exportToCSV()" style="background:none; color:#aaa; border:1px solid #444; cursor:pointer">📊 ייצוא</button>
+            <button onclick="clearOldReports()" style="background:none; color:#ff5252; border:1px solid #ff5252; cursor:pointer">🗑️ ניקוי</button>
+        </div>
+        <div id="reports-list"></div>
     </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query, orderBy, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
@@ -42,68 +53,60 @@
             projectId: "safezone-cd4b5",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
-
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const map = L.map('map').setView([32.0853, 34.7818], 9);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         const listDiv = document.getElementById('reports-list');
-        const markers = {}; // שומר את הנקודות כדי שנוכל לנקות אותן
+        const countRed = document.getElementById('count-red');
+        const countGreen = document.getElementById('count-green');
 
-        // פונקציית המחיקה
-        window.clearAllReports = async () => {
-            if (confirm("האם אתה בטוח שברצונך למחוק את כל הדיווחים מהמפה? פעולה זו אינה ניתנת לביטול.")) {
-                const querySnapshot = await getDocs(collection(db, "reports"));
-                querySnapshot.forEach(async (document) => {
-                    await deleteDoc(doc(db, "reports", document.id));
-                });
-                location.reload(); // רענון מהיר לניקוי סופי של התצוגה
-            }
-        };
-
-        const q = query(collection(db, "reports"), orderBy("time", "desc"));
-
-        onSnapshot(q, (snapshot) => {
+        onSnapshot(query(collection(db, "reports"), orderBy("time", "desc")), (snapshot) => {
             listDiv.innerHTML = "";
-            // ניקוי מרקרים קיימים מהמפה לפני עדכון
-            map.eachLayer((layer) => {
-                if (layer instanceof L.CircleMarker) map.removeLayer(layer);
-            });
+            let red = 0, green = 0;
+            const now = new Date().getTime();
 
-            if (snapshot.empty) {
-                listDiv.innerHTML = "<p style='text-align:center; color:#888'>אין דיווחים פעילים</p>";
-                return;
-            }
+            map.eachLayer(l => { if (l instanceof L.CircleMarker) map.removeLayer(l); });
 
-            snapshot.forEach((doc) => {
-                const d = doc.data();
-                const isEmergency = d.status === 'זקוק לעזרה';
-                const color = isEmergency ? 'red' : 'green';
-                const timeStr = d.time ? d.time.toDate().toLocaleTimeString('he-IL') : 'עכשיו';
+            snapshot.forEach((docSnap) => {
+                const d = docSnap.data();
+                const reportTime = d.time ? d.time.toDate().getTime() : now;
+                const diffMinutes = (now - reportTime) / 1000 / 60;
 
-                // הוספה למפה
-                L.circleMarker([d.lat, d.lng], { 
-                    color: isEmergency ? '#ff5252' : '#4caf50', 
-                    radius: 12, 
-                    fillOpacity: 0.9,
-                    weight: 2
-                }).addTo(map).bindPopup(`<b>${d.name}</b><br>${d.status}`);
+                // 1. הסרת ירוקים אחרי 20 דקות (לא נרנדר אותם)
+                if (d.status === 'בטוח במקלט' && diffMinutes > 20) return;
+
+                if (d.status === 'זקוק לעזרה') red++;
+                if (d.status === 'בטוח במקלט') green++;
+
+                const color = d.status === 'זקוק לעזרה' ? '#ff5252' : (d.status === 'בטוח במקלט' ? '#4caf50' : '#ff9800');
+                
+                // הוספה למפה + כפתור Waze בתוך הבועה
+                L.circleMarker([d.lat, d.lng], { color, radius: 12, fillOpacity: 0.9 }).addTo(map)
+                 .bindPopup(`
+                    <b>${d.name}</b><br>${d.status}<br>
+                    <a href="https://www.waze.com/ul?ll=${d.lat},${d.lng}&navigate=yes" target="_blank" style="display:block; margin-top:5px; text-decoration:none; background:#33ccff; color:black; padding:5px; border-radius:3px; text-align:center; font-weight:bold;">פתח ב-Waze 🚗</a>
+                 `);
 
                 // הוספה לרשימה בצד
                 const item = document.createElement('div');
-                item.className = `report-item ${isEmergency ? 'status-red' : 'status-green'}`;
+                item.className = `report-item status-${d.status === 'זקוק לעזרה' ? 'red' : (d.status === 'בטוח במקלט' ? 'green' : 'orange')}`;
                 item.innerHTML = `
-                    <div style="display:flex; justify-content:space-between">
-                        <strong>${d.name}</strong>
-                        <small>${timeStr}</small>
+                    <strong>${d.name}</strong> <small>(${Math.floor(diffMinutes)} דק')</small><br>
+                    <span>${d.status}</span>
+                    <div class="btn-row">
+                        <button class="action-btn btn-waze" onclick="window.open('https://www.waze.com/ul?ll=${d.lat},${d.lng}&navigate=yes')">Waze</button>
+                        ${d.status === 'בדרך למקלט' ? `<button class="action-btn btn-sms" onclick="location.href='sms:${d.phone}?body=היי ${d.name}, ראיתי שאתה בדרך, הגעת למרחב מוגן?'">שלח SMS</button>` : ''}
                     </div>
-                    <div style="margin-top:5px">${d.status}</div>
-                    <small>${d.phone}</small>
                 `;
                 listDiv.appendChild(item);
             });
+            countRed.innerText = red;
+            countGreen.innerText = green;
         });
+
+        window.clearAllReports = async () => { if (confirm("למחוק הכל?")) { (await getDocs(collection(db, "reports"))).forEach(d => deleteDoc(doc(db, "reports", d.id))); } };
     </script>
 </body>
 </html>
