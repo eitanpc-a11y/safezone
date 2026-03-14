@@ -13,9 +13,9 @@
         h1 { color: var(--red); font-size: 2.2rem; margin-bottom: 5px; }
         input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1.1rem; text-align: center; }
         .btn-grid { display: grid; gap: 12px; margin-top: 10px; }
-        .emergency-btn { padding: 22px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .emergency-btn { padding: 22px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; }
         .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
-        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; }
+        #status-msg { margin-top: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -36,8 +36,6 @@
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
             projectId: "safezone-cd4b5",
-            storageBucket: "safezone-cd4b5.firebasestorage.app",
-            messagingSenderId: "78949340231",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
         firebase.initializeApp(firebaseConfig);
@@ -47,7 +45,7 @@
             const msg = document.getElementById('status-msg');
             const name = document.getElementById('userName').value;
             if (!name) { alert("חובה להזין שם"); return; }
-            msg.innerText = "שולח מיקום... 📡";
+            msg.innerText = "מאתר מיקום... 📡";
             
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await db.collection("reports").add({
@@ -58,9 +56,9 @@
                     lng: pos.coords.longitude,
                     time: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                msg.innerText = "✅ הדיווח התקבל בחמ\"ל!";
+                msg.innerText = "✅ הדיווח התקבל!";
                 msg.style.color = "green";
-            }, (err) => { msg.innerText = "❌ חובה לאשר מיקום!"; msg.style.color = "red"; }, {timeout: 10000});
+            }, (err) => { msg.innerText = "❌ חובה לאשר מיקום!"; });
         }
     </script>
 </body>
