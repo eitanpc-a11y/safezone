@@ -4,30 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SafeZone - דיווח חירום</title>
+    
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         :root { --red: #d32f2f; --orange: #f57c00; --green: #388e3c; }
-        body { font-family: system-ui, sans-serif; background: #f4f7f9; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+        body { font-family: system-ui, sans-serif; background: #f4f7f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; z-index: 1000; }
         input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1.1rem; text-align: center; }
-        .btn { width: 100%; padding: 22px; margin: 8px 0; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; transition: 0.2s; }
+        .btn { width: 100%; padding: 20px; margin: 8px 0; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
         .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
-        .btn:active { transform: scale(0.98); opacity: 0.9; }
-        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; }
+        #status-msg { margin-top: 15px; font-weight: bold; min-height: 24px; color: #555; }
+        
+        /* סגנון למפת הבחירה הידנית */
+        #manual-map-container { display: none; width: 100%; max-width: 400px; margin-top: 20px; }
+        #map-picker { height: 300px; border-radius: 15px; border: 2px solid #ccc; margin-bottom: 10px; }
+        .manual-btn { background: #333; color: white; width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer; }
     </style>
 </head>
 <body>
+
     <div class="card">
-        <h1 style="color: var(--red); margin: 0 0 10px 0;">SafeZone</h1>
+        <h1 style="color: var(--red); margin: 0 0 15px 0;">SafeZone 🆘</h1>
         <input type="text" id="userName" placeholder="שם מלא">
         <input type="tel" id="userPhone" placeholder="מספר טלפון">
         
-        <button class="btn red" onclick="sendReport('זקוק לעזרה')">🆘 זקוק לעזרה</button>
-        <button class="btn orange" onclick="sendReport('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
-        <button class="btn green" onclick="sendReport('בטוח במקלט')">✅ אני בטוח</button>
+        <button class="btn red" onclick="handleReport('זקוק לעזרה')">🆘 זקוק לעזרה</button>
+        <button class="btn orange" onclick="handleReport('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
+        <button class="btn green" onclick="handleReport('בטוח במקלט')">✅ אני בטוח</button>
         
         <div id="status-msg"></div>
+    </div>
+
+    <div id="manual-map-container">
+        <p style="text-align: center; font-weight: bold; margin-bottom: 5px;">בחר מיקום מדויק על המפה:</p>
+        <div id="map-picker"></div>
+        <button class="manual-btn" onclick="sendManualReport()">שלח מיקום שנבחר 📍</button>
     </div>
 
     <script>
@@ -40,36 +55,82 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        let manualMap, manualMarker, selectedStatus;
+        let selectedLat = 32.0853, selectedLng = 34.7818; // ברירת מחדל ת"א
+
         window.onload = () => {
             document.getElementById('userName').value = localStorage.getItem('sz_name') || "";
             document.getElementById('userPhone').value = localStorage.getItem('sz_phone') || "";
         };
 
-        async function sendReport(status) {
+        async function handleReport(status) {
+            selectedStatus = status;
             const name = document.getElementById('userName').value;
-            const phone = document.getElementById('userPhone').value;
-            if (!name) return alert("חובה להזין שם");
-            
+            if (!name) return alert("אנא הזן שם");
             localStorage.setItem('sz_name', name);
-            localStorage.setItem('sz_phone', phone);
-            
+            localStorage.setItem('sz_phone', document.getElementById('userPhone').value);
+
             const msg = document.getElementById('status-msg');
-            msg.innerText = "שולח מיקום... 📡";
-            msg.style.color = "blue";
+            msg.innerText = "מזהה מיקום... 📡";
 
             navigator.geolocation.getCurrentPosition(async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+
+                // בדיקת שיבוש (אם המיקום באירלנד - קו רוחב 53)
+                if (Math.floor(lat) === 53 || Math.floor(lat) === 33) {
+                    msg.innerHTML = "⚠️ שיבוש GPS זוהה (דבלין/ביירות).<br>אנא סמן מיקום ידני במפה למטה:";
+                    showManualMap();
+                } else {
+                    sendToFirebase(lat, lng, status);
+                }
+            }, (err) => {
+                msg.innerText = "❌ שגיאת GPS. נא לסמן ידנית:";
+                showManualMap();
+            }, { enableHighAccuracy: false, timeout: 8000 });
+        }
+
+        function showManualMap() {
+            document.getElementById('manual-map-container').style.display = 'block';
+            if (!manualMap) {
+                manualMap = L.map('map-picker').setView([32.0853, 34.7818], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(manualMap);
+                
+                manualMarker = L.marker([32.0853, 34.7818], {draggable: true}).addTo(manualMap);
+                manualMap.on('click', (e) => {
+                    manualMarker.setLatLng(e.latlng);
+                    selectedLat = e.latlng.lat;
+                    selectedLng = e.latlng.lng;
+                });
+                manualMarker.on('dragend', (e) => {
+                    selectedLat = e.target.getLatLng().lat;
+                    selectedLng = e.target.getLatLng().lng;
+                });
+            }
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        async function sendManualReport() {
+            sendToFirebase(selectedLat, selectedLng, selectedStatus);
+        }
+
+        async function sendToFirebase(lat, lng, status) {
+            const msg = document.getElementById('status-msg');
+            try {
                 await db.collection("reports").add({
-                    name, phone, status,
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude,
+                    name: document.getElementById('userName').value,
+                    phone: document.getElementById('userPhone').value || "לא צוין",
+                    status: status,
+                    lat: lat,
+                    lng: lng,
                     time: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                msg.innerText = "✅ הדיווח התקבל בחמ\"ל!";
+                msg.innerText = "✅ הדיווח נשלח בהצלחה!";
                 msg.style.color = "green";
-            }, (err) => {
-                msg.innerText = "❌ שגיאת מיקום. וודא שה-GPS פועל.";
-                msg.style.color = "red";
-            }, { enableHighAccuracy: false, timeout: 10000 });
+                document.getElementById('manual-map-container').style.display = 'none';
+            } catch (e) {
+                msg.innerText = "❌ שגיאת שרת: " + e.message;
+            }
         }
     </script>
 </body>
