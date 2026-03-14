@@ -3,27 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SafeZone - דיווח מהשטח</title>
+    <title>SafeZone - דיווח חירום</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
-        :root { --red: #d32f2f; --green: #388e3c; }
-        body { font-family: system-ui, sans-serif; background: #f0f2f5; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-        input { width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box; font-size: 1rem; }
-        .btn { width: 100%; padding: 20px; margin: 5px 0; border: none; border-radius: 12px; font-weight: bold; font-size: 1.2rem; color: white; cursor: pointer; }
-        .red { background: var(--red); } .green { background: var(--green); }
-        #status { margin-top: 15px; font-weight: bold; }
+        :root { --red: #d32f2f; --orange: #f57c00; --green: #388e3c; }
+        body { font-family: system-ui, sans-serif; background: #f4f7f9; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+        input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1.1rem; text-align: center; }
+        .btn { width: 100%; padding: 22px; margin: 8px 0; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 1.3rem; cursor: pointer; transition: 0.2s; }
+        .red { background: var(--red); } .orange { background: var(--orange); } .green { background: var(--green); }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        #status-msg { margin-top: 20px; font-weight: bold; min-height: 24px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2 style="color: var(--red)">SafeZone 🆘</h2>
-        <input type="text" id="name" placeholder="שם מלא">
-        <input type="tel" id="phone" placeholder="טלפון">
+        <h1 style="color: var(--red); margin: 0 0 10px 0;">SafeZone</h1>
+        <input type="text" id="userName" placeholder="שם מלא">
+        <input type="tel" id="userPhone" placeholder="מספר טלפון">
+        
         <button class="btn red" onclick="sendReport('זקוק לעזרה')">🆘 זקוק לעזרה</button>
+        <button class="btn orange" onclick="sendReport('בדרך למרחב מוגן')">🏃 בדרך למקלט</button>
         <button class="btn green" onclick="sendReport('בטוח במקלט')">✅ אני בטוח</button>
-        <div id="status"></div>
+        
+        <div id="status-msg"></div>
     </div>
 
     <script>
@@ -36,29 +40,22 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // שמירה וטעינה של פרטים
         window.onload = () => {
-            document.getElementById('name').value = localStorage.getItem('sz_name') || "";
-            document.getElementById('phone').value = localStorage.getItem('sz_phone') || "";
+            document.getElementById('userName').value = localStorage.getItem('sz_name') || "";
+            document.getElementById('userPhone').value = localStorage.getItem('sz_phone') || "";
         };
 
         async function sendReport(status) {
-            const name = document.getElementById('name').value;
-            const phone = document.getElementById('phone').value;
-            if (!name) return alert("הכנס שם");
+            const name = document.getElementById('userName').value;
+            const phone = document.getElementById('userPhone').value;
+            if (!name) return alert("חובה להזין שם");
             
             localStorage.setItem('sz_name', name);
             localStorage.setItem('sz_phone', phone);
             
-            const msg = document.getElementById('status');
-            msg.innerText = "מאתר מיקום (עוקף שיבושים)... 📡";
-
-            // הגדרות למלחמה בשיבושי GPS בישראל
-            const geoOptions = {
-                enableHighAccuracy: false, // קריטי! עוזר למנוע קפיצה לדבלין
-                timeout: 10000,
-                maximumAge: 0
-            };
+            const msg = document.getElementById('status-msg');
+            msg.innerText = "שולח מיקום... 📡";
+            msg.style.color = "blue";
 
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 await db.collection("reports").add({
@@ -67,11 +64,12 @@
                     lng: pos.coords.longitude,
                     time: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                msg.innerText = "✅ הדיווח נשלח בהצלחה!";
+                msg.innerText = "✅ הדיווח התקבל בחמ\"ל!";
                 msg.style.color = "green";
             }, (err) => {
-                msg.innerText = "❌ שגיאת מיקום: " + err.message;
-            }, geoOptions);
+                msg.innerText = "❌ שגיאת מיקום. וודא שה-GPS פועל.";
+                msg.style.color = "red";
+            }, { enableHighAccuracy: false, timeout: 10000 });
         }
     </script>
 </body>
