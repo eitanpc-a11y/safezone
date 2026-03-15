@@ -6,6 +6,11 @@
     <title>SafeZone - אפליקציית צוות</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#e67e22">
+    <!-- iOS PWA support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SafeZone">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -160,6 +165,30 @@
 
         footer { margin-top: 20px; color: var(--text-muted); font-size: 0.73rem; text-align: center; }
 
+        /* ===== באנר אזעקה (כשהאפליקציה פתוחה) ===== */
+        #alert-banner {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 8888;
+            background: #c0392b;
+            color: white; text-align: center;
+            padding: 14px; font-size: 1rem; font-weight: bold;
+            animation: flashRed 0.6s infinite alternate;
+        }
+        @keyframes flashRed {
+            from { background: #c0392b; }
+            to   { background: #e74c3c; }
+        }
+
+        /* ===== כפתורים נעולים ===== */
+        .status-btn:disabled {
+            opacity: 0.3 !important;
+            cursor: not-allowed !important;
+            transform: none !important;
+            filter: none !important;
+        }
+        .status-label-locked { color: #2ecc71 !important; }
+        .status-label-alert  { color: #e74c3c !important; font-weight: bold; }
+
         /* ===== מפה לבחירת מיקום ידנית ===== */
         #map-modal {
             display: none;
@@ -284,6 +313,9 @@
         <footer>SafeZone v2.0 &bull; מערכת צוות חירום</footer>
     </div>
 
+    <!-- באנר אזעקה (מופיע בראש המסך כשהאפליקציה פתוחה) -->
+    <div id="alert-banner">🚨 צבע אדום! דווח את מצבך</div>
+
     <!-- מודל בחירת מיקום ידנית -->
     <div id="map-modal">
         <div class="map-modal-box">
@@ -318,16 +350,78 @@
 
         let currentToken = localStorage.getItem('safezone_token');
 
-        // בדיקת URL params — מהכפתורים בנוטיפיקציה
+        // בדיקת URL params — מהנוטיפיקציה
         const urlParams = new URLSearchParams(window.location.search);
-        const autoStatus = urlParams.get('status');
+        const autoStatus = urlParams.get('status'); // לחיצה על כפתור בנוטיפיקציה
+        const alertParam = urlParams.get('alert');  // לחיצה על גוף הנוטיפיקציה
 
         if (currentToken) {
             showActiveState();
             if (autoStatus) {
-                setTimeout(() => reportStatus(autoStatus), 800);
+                // לחיצה על כפתור בנוטיפיקציה — פתח כפתורים ודווח אוטומטית
+                unlockButtons(false);
+                setTimeout(() => reportStatus(autoStatus), 600);
+            } else if (alertParam === '1') {
+                // לחיצה על גוף הנוטיפיקציה — פתח כפתורים לבחירה
+                unlockButtons(true);
             }
         }
+
+        // ===== הקשבה להודעות מה-Service Worker =====
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'NEW_ALERT' && currentToken) {
+                    unlockButtons(true);
+                    showAlertBanner();
+                }
+            });
+        }
+
+        // ===== כשהאפליקציה פתוחה ומגיעה אזעקה =====
+        messaging.onMessage(function(payload) {
+            if (currentToken) {
+                unlockButtons(true);
+                showAlertBanner();
+            }
+        });
+
+        function showAlertBanner() {
+            const b = document.getElementById('alert-banner');
+            if (!b) return;
+            b.style.display = 'block';
+            // הסתר אחרי 30 שניות
+            setTimeout(() => { b.style.display = 'none'; }, 30000);
+        }
+
+        // ===== נעילה / פתיחת כפתורי סטטוס =====
+        function lockButtons() {
+            document.querySelectorAll('.status-btn').forEach(b => b.disabled = true);
+            const lbl = document.getElementById('statusPanelLabel');
+            if (lbl) {
+                lbl.textContent = '✅ דיווח נשלח — ממתין לאזעקה הבאה';
+                lbl.className = 'status-label status-label-locked';
+            }
+            localStorage.setItem('safezone_locked', '1');
+        }
+
+        function unlockButtons(fromAlert) {
+            document.querySelectorAll('.status-btn').forEach(b => {
+                b.disabled = false;
+                b.classList.remove('active');
+            });
+            const lbl = document.getElementById('statusPanelLabel');
+            if (lbl) {
+                lbl.textContent = fromAlert ? '🚨 אזעקה! דווח את מצבך:' : 'דווח את מצבך כעת:';
+                lbl.className = fromAlert
+                    ? 'status-label status-label-alert'
+                    : 'status-label';
+            }
+            const bar = document.getElementById('currentStatusBar');
+            if (bar) bar.style.display = 'none';
+            localStorage.removeItem('safezone_locked');
+            localStorage.removeItem('safezone_status');
+        }
+        // ============================================
 
         function setStatus(text, cls) {
             const el = document.getElementById('status');
@@ -344,9 +438,11 @@
             document.getElementById('status-panel').style.display = 'block';
             document.getElementById('deactivateBtn').style.display = 'block';
 
-            // שחזר סטטוס קיים
+            // שחזר מצב נעילה
             const savedStatus = localStorage.getItem('safezone_status');
+            const isLocked    = localStorage.getItem('safezone_locked') === '1';
             if (savedStatus) highlightStatusBtn(savedStatus);
+            if (isLocked) lockButtons();
         }
 
         // ===== בחירת מיקום ידנית =====
@@ -490,6 +586,8 @@
                 });
                 localStorage.setItem('safezone_status', status);
                 highlightStatusBtn(status);
+                // נעל כפתורים עד לאזעקה הבאה
+                lockButtons();
             } catch(e) {
                 alert("שגיאה בעדכון סטטוס: " + e.message);
             }
@@ -500,10 +598,6 @@
             document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
             const btn = document.querySelector(`.status-btn.${status}`);
             if (btn) btn.classList.add('active');
-
-            // עדכן כותרת לאפשרות שינוי
-            const lbl = document.getElementById('statusPanelLabel');
-            if (lbl) lbl.textContent = 'סטטוס עודכן — לחץ שוב כדי לשנות:';
 
             const bar = document.getElementById('currentStatusBar');
             bar.textContent = `הסטטוס הנוכחי: ${labels[status]}`;
@@ -521,7 +615,7 @@
                 if (currentToken) await db.collection('tokens').doc(currentToken).delete();
             } catch(e) {}
 
-            ['safezone_token','safezone_name','safezone_city','safezone_status'].forEach(k => localStorage.removeItem(k));
+            ['safezone_token','safezone_name','safezone_city','safezone_status','safezone_locked'].forEach(k => localStorage.removeItem(k));
             currentToken = null;
 
             try {

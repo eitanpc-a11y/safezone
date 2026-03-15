@@ -12,21 +12,30 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// טיפול בהתראות שמגיעות כשהאפליקציה ברקע
+// אזעקה ברקע — שלח הודעה לכל לשוניות פתוחות ותציג push
 messaging.onBackgroundMessage(function(payload) {
     const title = payload.notification?.title || '🚨 צבע אדום!';
     const body  = payload.notification?.body  || 'אזעקה באזורך — היכנס למרחב מוגן';
 
-    self.registration.showNotification(title, {
+    // הודע לכל לשוניות פתוחות לפתוח את הכפתורים
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+        windowClients.forEach(function(client) {
+            client.postMessage({ type: 'NEW_ALERT' });
+        });
+    });
+
+    // הצג push notification (ללא קול מותאם — קול מערכת בלבד)
+    return self.registration.showNotification(title, {
         body: body,
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-72.png',
-        vibrate: [300, 100, 300, 100, 300],
+        vibrate: [400, 100, 400, 100, 400],
         requireInteraction: true,
         tag: 'safezone-alert',
         renotify: true,
         dir: 'rtl',
         lang: 'he',
+        // כפתורי פעולה — עובד ב-Android, לא נתמך ב-iOS
         actions: [
             { action: 'safe',  title: '✅ אני בטוח' },
             { action: 'onway', title: '🚗 אני בדרך' },
@@ -36,25 +45,28 @@ messaging.onBackgroundMessage(function(payload) {
     });
 });
 
-// טיפול בלחיצה על הנוטיפיקציה וכפתורי הפעולה
+// לחיצה על הנוטיפיקציה או כפתורי הפעולה
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
     const action = event.action;
-    let url = '/';
+    let url;
 
     if (action === 'safe')       url = '/?status=safe';
     else if (action === 'onway') url = '/?status=onway';
     else if (action === 'help')  url = '/?status=help';
+    else                         url = '/?alert=1'; // לחיצה על גוף ההתראה — פתח ותן לבחור
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            // אם האפליקציה כבר פתוחה — נווט אליה
             for (const client of windowClients) {
                 if ('focus' in client) {
                     client.navigate(url);
                     return client.focus();
                 }
             }
+            // פתח חלון חדש
             if (clients.openWindow) return clients.openWindow(url);
         })
     );
