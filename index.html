@@ -4,39 +4,214 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SafeZone - אפליקציית צוות</title>
-    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e67e22">
+
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
     <style>
-        :root { --primary: #e67e22; --dark: #1a1a1a; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--dark); color: white; text-align: center; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .card { width: 90%; max-width: 400px; background: #2c3e50; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; font-size: 1rem; box-sizing: border-box; }
-        .btn { background: var(--primary); color: white; border: none; padding: 15px; font-size: 1.1rem; border-radius: 50px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
-        #status { margin-top: 20px; font-weight: bold; }
-        #loc-info { color: var(--primary); font-size: 0.9rem; margin-top: 5px; }
+        :root {
+            --primary: #e67e22;
+            --primary-dark: #d35400;
+            --dark: #1a1a1a;
+            --card-bg: #2c3e50;
+            --success: #2ecc71;
+            --error: #e74c3c;
+            --text-muted: #95a5a6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: var(--dark);
+            color: white;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card-bg);
+            padding: 32px 24px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+
+        .logo { font-size: 3rem; margin-bottom: 8px; }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 4px;
+            color: white;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .form-group { margin-bottom: 12px; text-align: right; }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 13px 14px;
+            border-radius: 10px;
+            border: 2px solid transparent;
+            font-size: 1rem;
+            background: #1a252f;
+            color: white;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        select option { background: #1a252f; }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            margin-top: 16px;
+            transition: background 0.2s, transform 0.1s;
+            font-family: inherit;
+        }
+
+        .btn:hover { background: var(--primary-dark); }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+
+        .btn-deactivate {
+            background: #555;
+            margin-top: 8px;
+        }
+
+        .btn-deactivate:hover { background: #444; }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            font-size: 1rem;
+            min-height: 28px;
+        }
+
+        #loc-info {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 6px;
+            min-height: 20px;
+        }
+
+        .status-active { color: var(--success); }
+        .status-error { color: var(--error); }
+        .status-loading { color: var(--primary); }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .permission-hint {
+            background: rgba(231, 76, 60, 0.1);
+            border: 1px solid rgba(231, 76, 60, 0.3);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #e74c3c;
+            display: none;
+            text-align: right;
+        }
+
+        .permission-hint.show { display: block; }
+
+        footer {
+            margin-top: 24px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1>🛡️ SafeZone</h1>
-        <p>מערכת הגנה לצוותי חירום</p>
-        
-        <input type="text" id="userName" placeholder="שם מלא">
-        <select id="userCity">
-            <option value="">בחר עיר מגורים/עבודה</option>
-            <option value="יהוד-מונוסון">יהוד-מונוסון</option>
-            <option value="חולון">חולון</option>
-            <option value="תל אביב - יפו">תל אביב - יפו</option>
-            <option value="אור יהודה">אור יהודה</option>
-        </select>
+        <div class="logo">🛡️</div>
+        <h1>SafeZone</h1>
+        <p class="subtitle">מערכת הגנה לצוותי חירום</p>
 
-        <button class="btn" id="activateBtn" onclick="activateSystem()">הפעל הגנה ודיווח מיקום</button>
-        
+        <div class="form-group">
+            <label for="userName">שם מלא</label>
+            <input type="text" id="userName" placeholder="הכנס את שמך" autocomplete="name">
+        </div>
+
+        <div class="form-group">
+            <label for="userCity">עיר מגורים / עבודה</label>
+            <select id="userCity">
+                <option value="">בחר עיר</option>
+                <option value="יהוד-מונוסון">יהוד-מונוסון</option>
+                <option value="חולון">חולון</option>
+                <option value="תל אביב - יפו">תל אביב - יפו</option>
+                <option value="אור יהודה">אור יהודה</option>
+                <option value="ראשון לציון">ראשון לציון</option>
+                <option value="פתח תקווה">פתח תקווה</option>
+                <option value="בת ים">בת ים</option>
+                <option value="רמת גן">רמת גן</option>
+                <option value="גבעתיים">גבעתיים</option>
+                <option value="בני ברק">בני ברק</option>
+            </select>
+        </div>
+
+        <button class="btn" id="activateBtn" onclick="activateSystem()">
+            הפעל הגנה ודיווח מיקום
+        </button>
+
+        <button class="btn btn-deactivate" id="deactivateBtn" onclick="deactivateSystem()" style="display:none;">
+            בטל רישום
+        </button>
+
         <div id="status">המערכת לא פעילה</div>
         <div id="loc-info"></div>
+
+        <div class="permission-hint" id="permHint">
+            ⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן כדי שהמערכת תעבוד.
+        </div>
+
+        <footer>SafeZone v2.0 &bull; מערכת צוות חירום</footer>
     </div>
 
     <script>
@@ -48,50 +223,168 @@
             messagingSenderId: "78949340231",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
+
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const messaging = firebase.messaging();
 
+        let currentToken = localStorage.getItem('safezone_token');
+
+        // אם יש token שמור — הצג מצב פעיל
+        if (currentToken) {
+            showActiveStatus();
+        }
+
+        function setStatus(text, cls) {
+            const el = document.getElementById('status');
+            el.textContent = text;
+            el.className = cls || '';
+        }
+
+        function setLocInfo(text) {
+            document.getElementById('loc-info').textContent = text;
+        }
+
+        function showActiveStatus() {
+            setStatus('✅ הגנה פעילה', 'status-active');
+            const city = localStorage.getItem('safezone_city') || '';
+            const name = localStorage.getItem('safezone_name') || '';
+            setLocInfo(`${name} — ${city}`);
+            document.getElementById('activateBtn').style.display = 'none';
+            document.getElementById('deactivateBtn').style.display = 'block';
+
+            // מלא שדות אם יש מידע שמור
+            if (name) document.getElementById('userName').value = name;
+            if (city) document.getElementById('userCity').value = city;
+        }
+
         async function activateSystem() {
-            const name = document.getElementById('userName').value;
+            const name = document.getElementById('userName').value.trim();
             const selectedCity = document.getElementById('userCity').value;
 
-            if(!name || !selectedCity) return alert("נא למלא שם ולבחור עיר");
+            if (!name) {
+                alert("נא להכניס שם מלא");
+                document.getElementById('userName').focus();
+                return;
+            }
+            if (!selectedCity) {
+                alert("נא לבחור עיר");
+                document.getElementById('userCity').focus();
+                return;
+            }
+
+            const btn = document.getElementById('activateBtn');
+            btn.disabled = true;
+            btn.innerHTML = 'מתחבר... <span class="spinner"></span>';
+            setStatus('מתחבר...', 'status-loading');
+            document.getElementById('permHint').classList.remove('show');
 
             try {
-                // 1. קבלת מיקום GPS מדויק
-                const pos = await new Promise((res, rej) => {
-                    navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000 });
-                });
-                const { latitude, longitude } = pos.coords;
+                // שלב 1: קבלת מיקום GPS
+                setStatus('מאתר מיקום...', 'status-loading');
+                let latitude, longitude;
 
-                // 2. הרשאה להתראות
+                try {
+                    const pos = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            timeout: 12000,
+                            enableHighAccuracy: true
+                        });
+                    });
+                    latitude = pos.coords.latitude;
+                    longitude = pos.coords.longitude;
+                } catch (geoErr) {
+                    document.getElementById('permHint').classList.add('show');
+                    throw new Error("לא ניתן לקבל מיקום GPS. אנא אפשר הרשאות מיקום.");
+                }
+
+                // שלב 2: הרשאת התראות
+                setStatus('מבקש הרשאות התראות...', 'status-loading');
                 const permission = await Notification.requestPermission();
-                if (permission !== 'granted') throw "יש לאשר התראות כדי לקבל צבע אדום";
+                if (permission !== 'granted') {
+                    document.getElementById('permHint').classList.add('show');
+                    throw new Error("יש לאשר התראות כדי לקבל צבע אדום");
+                }
 
-                const sw = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-                const token = await messaging.getToken({ 
-                    serviceWorkerRegistration: sw,
+                // שלב 3: רישום Service Worker וקבלת FCM token
+                setStatus('רושם למערכת...', 'status-loading');
+                const swRegistration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+
+                const token = await messaging.getToken({
+                    serviceWorkerRegistration: swRegistration,
                     vapidKey: "BIXCZU-c8gIaA5JScoc7-wDLWKZErE9YM1-NKt0ot0UZq6c6iGKWQgxBHaFzquGlyjL6pMwpV-vH0NOq6XmxZGo"
                 });
 
-                // 3. שמירה ל-Database
+                if (!token) {
+                    throw new Error("לא ניתן לקבל token להתראות. נסה שוב.");
+                }
+
+                // שלב 4: שמירה ב-Firestore
+                // ה-token עצמו הוא מזהה המסמך — כך הפונקציה בשרת תוכל לשלוח לו הודעה
                 await db.collection('tokens').doc(token).set({
                     name: name,
                     city: selectedCity,
                     lat: latitude,
                     lng: longitude,
+                    token: token,
                     lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                document.getElementById('status').innerText = "✅ הגנה פעילה";
-                document.getElementById('status').style.color = "#2ecc71";
-                document.getElementById('loc-info').innerText = `מיקום GPS נקלט בהצלחה`;
-                alert("נרשמת בהצלחה! המיקום שלך מעודכן במפה.");
+                // שמור locally
+                currentToken = token;
+                localStorage.setItem('safezone_token', token);
+                localStorage.setItem('safezone_name', name);
+                localStorage.setItem('safezone_city', selectedCity);
 
-            } catch (e) {
-                alert("שגיאה: " + e);
+                showActiveStatus();
+                setLocInfo(`GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} — ${selectedCity}`);
+
+            } catch (err) {
+                console.error(err);
+                setStatus('❌ שגיאה בחיבור', 'status-error');
+                setLocInfo('');
+                alert("שגיאה: " + (err.message || err));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'הפעל הגנה ודיווח מיקום';
             }
+        }
+
+        async function deactivateSystem() {
+            if (!confirm("האם לבטל את הרישום למערכת SafeZone?")) return;
+
+            const btn = document.getElementById('deactivateBtn');
+            btn.disabled = true;
+            btn.textContent = 'מבטל רישום...';
+
+            try {
+                if (currentToken) {
+                    await db.collection('tokens').doc(currentToken).delete();
+                }
+            } catch (e) {
+                console.warn('לא ניתן למחוק מה-DB:', e.message);
+            }
+
+            // נקה Local Storage
+            localStorage.removeItem('safezone_token');
+            localStorage.removeItem('safezone_name');
+            localStorage.removeItem('safezone_city');
+            currentToken = null;
+
+            // נקה service worker
+            try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) await reg.unregister();
+            } catch (e) {}
+
+            setStatus('המערכת לא פעילה', '');
+            setLocInfo('');
+            document.getElementById('activateBtn').style.display = 'block';
+            document.getElementById('deactivateBtn').style.display = 'none';
+            document.getElementById('deactivateBtn').disabled = false;
+            document.getElementById('deactivateBtn').textContent = 'בטל רישום';
+            document.getElementById('userName').value = '';
+            document.getElementById('userCity').value = '';
         }
     </script>
 </body>

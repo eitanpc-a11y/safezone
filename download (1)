@@ -1,0 +1,20 @@
+# Firebase
+.firebase/
+.firebaserc.local
+
+# Node modules — לא מעלים ל-GitHub
+functions/node_modules/
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/

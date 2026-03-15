@@ -10,22 +10,219 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+        /* ======= מסך כניסה ======= */
+        #login-screen {
+            position: fixed;
+            inset: 0;
+            background: #1a1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-card {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 16px;
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .login-card h2 { font-size: 1.5rem; margin-bottom: 6px; }
+        .login-card p { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+
+        .login-card input {
+            width: 100%;
+            padding: 13px;
+            border-radius: 8px;
+            border: 2px solid #0f3460;
+            background: #0d1117;
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            font-family: inherit;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .login-card input:focus {
+            outline: none;
+            border-color: #e74c3c;
+        }
+
+        .login-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 13px;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .login-btn:hover { background: #c0392b; }
+
+        .login-error {
+            color: #e74c3c;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* ======= מסך אדמין ======= */
+        #admin-screen { display: none; }
+
         #map { height: 100vh; width: 100%; }
-        .admin-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); width: 220px; }
-        .btn-test { background: #e74c3c; color: white; border: none; padding: 10px; width: 100%; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .user-count { font-weight: bold; color: #e67e22; }
+
+        .admin-panel {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            background: white;
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+            width: 240px;
+        }
+
+        .admin-panel h2 {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 8px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #e67e22;
+        }
+
+        .btn-test {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 11px;
+            width: 100%;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .btn-test:hover { background: #c0392b; }
+        .btn-test:disabled { background: #999; cursor: not-allowed; }
+
+        .btn-logout {
+            background: #ecf0f1;
+            color: #555;
+            border: none;
+            padding: 8px;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-top: 6px;
+            font-family: inherit;
+        }
+
+        .btn-logout:hover { background: #dfe6e9; }
+
+        .last-updated {
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .online-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #2ecc71;
+            border-radius: 50%;
+            margin-left: 4px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
     </style>
 </head>
 <body>
-    <div class="admin-panel">
-        <h2>🛡️ מפת בקרה SafeZone</h2>
-        <div>צוות מחובר: <span id="count" class="user-count">0</span></div>
-        <button class="btn-test" onclick="sendTestAlert()">🚨 הפעל ניסוי צופר</button>
+
+    <!-- ===== מסך כניסה ===== -->
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>🛡️ SafeZone Admin</h2>
+            <p>כניסה לפאנל בקרה — מנהלים בלבד</p>
+            <input type="password" id="adminPass" placeholder="הכנס סיסמת אדמין"
+                   onkeydown="if(event.key==='Enter') checkPassword()">
+            <button class="login-btn" onclick="checkPassword()">כניסה</button>
+            <div class="login-error" id="loginError">❌ סיסמה שגויה. נסה שוב.</div>
+        </div>
     </div>
-    <div id="map"></div>
+
+    <!-- ===== מסך אדמין ===== -->
+    <div id="admin-screen">
+        <div class="admin-panel">
+            <h2>🛡️ SafeZone Control</h2>
+            <div class="stat-row">
+                <span>צוות מחובר <span class="online-dot"></span></span>
+                <span class="stat-value" id="count">0</span>
+            </div>
+            <div class="stat-row">
+                <span>ערים פעילות</span>
+                <span class="stat-value" id="cityCount">0</span>
+            </div>
+            <button class="btn-test" id="testBtn" onclick="sendTestAlert()">
+                🚨 הפעל ניסוי צופר
+            </button>
+            <button class="btn-logout" onclick="logout()">יציאה</button>
+            <div class="last-updated" id="lastUpdated">מתחבר...</div>
+        </div>
+        <div id="map"></div>
+    </div>
 
     <script>
+        // ======================================================
+        // סיסמת אדמין — החלף בסיסמה חזקה שלך
+        // ======================================================
+        const ADMIN_PASSWORD = "SafeZone2024!";
+
+        // ======================================================
+        // מפתח API לפונקציית הניסוי בשרת
+        // ======================================================
+        const ADMIN_SECRET_KEY = "safezone-admin-2024";
+
         const firebaseConfig = {
             apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
@@ -34,38 +231,105 @@
             messagingSenderId: "78949340231",
             appId: "1:78949340231:web:85929f70752f1fc7cf8d62"
         };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
 
-        const map = L.map('map').setView([32.0853, 34.7818], 9);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        let db, map, markers = {};
 
-        let markers = {};
+        function checkPassword() {
+            const pass = document.getElementById('adminPass').value;
+            if (pass === ADMIN_PASSWORD) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('admin-screen').style.display = 'block';
+                initAdmin();
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+                document.getElementById('adminPass').value = '';
+                document.getElementById('adminPass').focus();
+            }
+        }
 
-        db.collection('tokens').onSnapshot((snapshot) => {
-            document.getElementById('count').innerText = snapshot.size;
-            snapshot.docChanges().forEach((change) => {
-                const data = change.doc.data();
-                const id = change.doc.id;
-                if (data.lat && data.lng) {
-                    if (markers[id]) {
-                        markers[id].setLatLng([data.lat, data.lng]);
-                    } else {
-                        markers[id] = L.marker([data.lat, data.lng]).addTo(map)
-                            .bindPopup(`<b>שם:</b> ${data.name || 'אנונימי'}<br><b>עיר:</b> ${data.city}`);
+        function logout() {
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('admin-screen').style.display = 'none';
+            document.getElementById('adminPass').value = '';
+        }
+
+        function initAdmin() {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+
+            map = L.map('map').setView([32.0853, 34.7818], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            // האזן לשינויים בזמן אמת
+            db.collection('tokens').onSnapshot((snapshot) => {
+                document.getElementById('count').innerText = snapshot.size;
+
+                const cities = new Set();
+
+                snapshot.docChanges().forEach((change) => {
+                    const docData = change.doc.data();
+                    const id = change.doc.id;
+
+                    if (change.type === 'removed') {
+                        if (markers[id]) {
+                            map.removeLayer(markers[id]);
+                            delete markers[id];
+                        }
+                        return;
                     }
-                }
+
+                    if (docData.lat && docData.lng) {
+                        const popupText = `
+                            <b>שם:</b> ${docData.name || 'אנונימי'}<br>
+                            <b>עיר:</b> ${docData.city || '-'}<br>
+                            <b>GPS:</b> ${docData.lat.toFixed(4)}, ${docData.lng.toFixed(4)}
+                        `;
+
+                        if (markers[id]) {
+                            markers[id].setLatLng([docData.lat, docData.lng]);
+                            markers[id].getPopup().setContent(popupText);
+                        } else {
+                            markers[id] = L.marker([docData.lat, docData.lng])
+                                .addTo(map)
+                                .bindPopup(popupText);
+                        }
+                    }
+
+                    if (docData.city) cities.add(docData.city);
+                });
+
+                // ספור ערים ייחודיות
+                const allCities = new Set();
+                snapshot.docs.forEach(doc => {
+                    if (doc.data().city) allCities.add(doc.data().city);
+                });
+                document.getElementById('cityCount').innerText = allCities.size;
+
+                const now = new Date().toLocaleTimeString('he-IL');
+                document.getElementById('lastUpdated').innerText = `עדכון אחרון: ${now}`;
             });
-        });
+        }
 
         async function sendTestAlert() {
-            if(!confirm("לשלח הודעת בדיקה לכל הצוות?")) return;
+            if (!confirm("לשלוח הודעת בדיקה לכל הצוות?")) return;
+
+            const btn = document.getElementById('testBtn');
+            btn.disabled = true;
+            btn.textContent = 'שולח...';
+
             try {
-                // שימוש בכתובת השרת החדשה ב-us-central1
-                const response = await fetch('https://us-central1-safezone-cd4b5.cloudfunctions.net/sendManualAlert');
+                const url = `https://us-central1-safezone-cd4b5.cloudfunctions.net/sendManualAlert?key=${ADMIN_SECRET_KEY}`;
+                const response = await fetch(url);
                 const result = await response.text();
-                alert(result);
-            } catch (e) { alert("שגיאה בשליחת הניסוי"); }
+                alert("✅ " + result);
+            } catch (e) {
+                alert("❌ שגיאה בשליחת הניסוי: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚨 הפעל ניסוי צופר';
+            }
         }
     </script>
 </body>

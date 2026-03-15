@@ -3,17 +3,30 @@
     "public": ".",
     "ignore": [
       "firebase.json",
-      "**/.*",
-      "**/node_modules/**",
-      "**/*.exe",
-      "**/*.ps1",
-      "**/*.zip"
+      ".firebaserc",
+      ".gitignore",
+      "functions/**",
+      "node_modules/**"
     ],
-    "rewrites": [
+    "rewrites": [],
+    "headers": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "firebase-messaging-sw.js",
+        "headers": [
+          {
+            "key": "Service-Worker-Allowed",
+            "value": "/"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
       }
     ]
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs18"
   }
 }
