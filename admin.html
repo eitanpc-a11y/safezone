@@ -90,6 +90,16 @@
         .stat-box.onway .stat-num { color: #ffc04d; }
         .stat-box.safe  .stat-num { color: #5edb8a; }
 
+        /* Fit map button */
+        .btn-fit-map {
+            background: rgba(52,152,219,0.15); color: #3498db;
+            border: 1px solid rgba(52,152,219,0.3);
+            width: 100%; padding: 9px; border-radius: 8px;
+            font-size: 0.82rem; font-weight: bold; cursor: pointer;
+            font-family: inherit; margin-bottom: 6px;
+        }
+        .btn-fit-map:hover { background: rgba(52,152,219,0.25); }
+
         /* Clear button */
         .btn-clear-all {
             background: #c0392b; color: white; border: none;
@@ -224,6 +234,9 @@
                     </div>
                 </div>
 
+                <button class="btn-fit-map" onclick="fitMapToMarkers()">
+                    🗺️ מרכז מפה על כולם
+                </button>
                 <button class="btn-clear-all" onclick="clearAllReports()">
                     🗑️ ניקוי כל הדיווחים מהמפה
                 </button>
@@ -400,6 +413,14 @@
         buildPersonsList();
     }
 
+    function fitMapToMarkers() {
+        const latlngs = Object.values(markers).map(m => m.getLatLng());
+        if (latlngs.length === 0) { alert("אין מיקומים להצגה במפה"); return; }
+        if (latlngs.length === 1) { map.setView(latlngs[0], 14); return; }
+        const group = L.featureGroup(Object.values(markers));
+        map.fitBounds(group.getBounds().pad(0.3));
+    }
+
     function openWaze(lat, lng) {
         if (!lat || !lng) return;
         window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
@@ -446,6 +467,8 @@
         // Update time labels every minute
         setInterval(() => { if (Object.keys(allDocs).length) buildPersonsList(); }, 60000);
 
+        let firstLoad = true;
+
         db.collection('tokens').onSnapshot(snapshot => {
             snapshot.docChanges().forEach(change => {
                 const id = change.doc.id;
@@ -466,6 +489,12 @@
             });
 
             buildPersonsList();
+
+            // מרכז מפה אוטומטית בטעינה ראשונה
+            if (firstLoad && Object.keys(markers).length > 0) {
+                firstLoad = false;
+                setTimeout(fitMapToMarkers, 300);
+            }
         });
     }
 </script>

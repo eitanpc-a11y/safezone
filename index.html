@@ -10,6 +10,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
         :root {
@@ -111,24 +113,24 @@
         }
 
         .status-btn {
-            border: none; border-radius: 14px; padding: 14px 6px;
+            border: 2px solid transparent; border-radius: 14px; padding: 14px 6px;
             font-size: 0.82rem; font-weight: bold; cursor: pointer;
-            font-family: inherit; transition: all 0.2s;
+            font-family: inherit; transition: all 0.15s;
             display: flex; flex-direction: column;
             align-items: center; gap: 6px; color: white;
-            opacity: 0.6;
         }
+        .status-btn:hover { transform: scale(1.04); filter: brightness(1.15); }
+        .status-btn:active { transform: scale(0.97); }
 
         .status-btn .icon { font-size: 1.5rem; }
 
-        .status-btn.safe   { background: #1e7e4a; }
-        .status-btn.onway  { background: #8a5e00; }
-        .status-btn.help   { background: #8b1a1a; }
+        .status-btn.safe   { background: #1e7e4a; border-color: #1e7e4a; }
+        .status-btn.onway  { background: #8a5e00; border-color: #8a5e00; }
+        .status-btn.help   { background: #8b1a1a; border-color: #8b1a1a; }
 
-        .status-btn.active { opacity: 1; transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-        .status-btn.safe.active  { background: var(--success); }
-        .status-btn.onway.active { background: var(--warning); }
-        .status-btn.help.active  { background: var(--error); box-shadow: 0 0 0 3px rgba(231,76,60,0.4); }
+        .status-btn.active.safe  { background: var(--success); border-color: white; box-shadow: 0 0 0 3px rgba(46,204,113,0.4); }
+        .status-btn.active.onway { background: var(--warning); border-color: white; box-shadow: 0 0 0 3px rgba(243,156,18,0.4); }
+        .status-btn.active.help  { background: var(--error);   border-color: white; box-shadow: 0 0 0 3px rgba(231,76,60,0.4); animation: pulse-border 1.5s infinite; }
 
         .current-status-bar {
             margin-top: 12px;
@@ -157,6 +159,63 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         footer { margin-top: 20px; color: var(--text-muted); font-size: 0.73rem; text-align: center; }
+
+        /* ===== מפה לבחירת מיקום ידנית ===== */
+        #map-modal {
+            display: none;
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.85);
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 16px;
+        }
+        #map-modal.open { display: flex; }
+
+        .map-modal-box {
+            background: #1e1e1e;
+            border-radius: 18px;
+            width: 100%;
+            max-width: 480px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        }
+
+        .map-modal-header {
+            padding: 16px 18px 12px;
+            background: #2c3e50;
+        }
+        .map-modal-header h3 { font-size: 1rem; margin: 0 0 4px; }
+        .map-modal-header p  { font-size: 0.8rem; color: #95a5a6; margin: 0; }
+
+        #location-pick-map {
+            width: 100%;
+            height: 320px;
+        }
+
+        .map-modal-footer {
+            padding: 12px 16px;
+            display: flex;
+            gap: 10px;
+            background: #1a1a1a;
+        }
+
+        .btn-pick-confirm {
+            flex: 1; background: var(--primary); color: white;
+            border: none; padding: 12px; border-radius: 10px;
+            font-size: 0.92rem; font-weight: bold; cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-pick-confirm:disabled { background: #555; cursor: not-allowed; }
+        .btn-pick-cancel {
+            background: #333; color: #aaa;
+            border: none; padding: 12px 16px; border-radius: 10px;
+            font-size: 0.88rem; cursor: pointer; font-family: inherit;
+        }
+        .pick-hint {
+            font-size: 0.78rem; color: #e67e22; text-align: center;
+            padding: 8px 16px 0; background: #1a1a1a;
+        }
     </style>
 </head>
 <body>
@@ -200,7 +259,7 @@
 
         <!-- פאנל דיווח סטטוס — מוצג אחרי הרשמה -->
         <div id="status-panel">
-            <p class="status-label">דווח את מצבך כעת:</p>
+            <p class="status-label" id="statusPanelLabel">דווח את מצבך כעת:</p>
             <div class="status-buttons">
                 <button class="status-btn safe" onclick="reportStatus('safe')">
                     <span class="icon">✅</span>
@@ -223,6 +282,24 @@
         </button>
 
         <footer>SafeZone v2.0 &bull; מערכת צוות חירום</footer>
+    </div>
+
+    <!-- מודל בחירת מיקום ידנית -->
+    <div id="map-modal">
+        <div class="map-modal-box">
+            <div class="map-modal-header">
+                <h3>📍 סמן את המיקום שלך במפה</h3>
+                <p>GPS לא זמין — לחץ על המפה לסימון מיקומך</p>
+            </div>
+            <div class="pick-hint">לחץ על המפה כדי למקם את הסמן</div>
+            <div id="location-pick-map"></div>
+            <div class="map-modal-footer">
+                <button class="btn-pick-confirm" id="confirmPickBtn" onclick="confirmPickedLocation()" disabled>
+                    📍 אשר מיקום
+                </button>
+                <button class="btn-pick-cancel" onclick="cancelMapPick()">ביטול</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -272,6 +349,73 @@
             if (savedStatus) highlightStatusBtn(savedStatus);
         }
 
+        // ===== בחירת מיקום ידנית =====
+        let pickMap = null, pickMarker = null, pickedLatLng = null;
+        let pickResolve = null, pickReject = null;
+
+        function getLocationWithFallback() {
+            return new Promise((resolve, reject) => {
+                setStatus('מאתר מיקום GPS...', 'status-loading');
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                    () => {
+                        // GPS נכשל — פתח מפה לבחירה ידנית
+                        setStatus('GPS לא זמין — בחר מיקום ידנית', 'status-loading');
+                        openMapPicker(resolve, reject);
+                    },
+                    { timeout: 10000, enableHighAccuracy: true }
+                );
+            });
+        }
+
+        function openMapPicker(resolve, reject) {
+            pickResolve = resolve;
+            pickReject  = reject;
+            pickedLatLng = null;
+
+            document.getElementById('map-modal').classList.add('open');
+            document.getElementById('confirmPickBtn').disabled = true;
+
+            // אתחל מפה פעם אחת
+            if (!pickMap) {
+                pickMap = L.map('location-pick-map').setView([31.77, 34.9], 8);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                }).addTo(pickMap);
+
+                pickMap.on('click', function(e) {
+                    pickedLatLng = e.latlng;
+                    if (pickMarker) {
+                        pickMarker.setLatLng(e.latlng);
+                    } else {
+                        pickMarker = L.marker(e.latlng, { draggable: true }).addTo(pickMap);
+                        pickMarker.on('dragend', function() {
+                            pickedLatLng = pickMarker.getLatLng();
+                        });
+                    }
+                    document.getElementById('confirmPickBtn').disabled = false;
+                    document.getElementById('confirmPickBtn').textContent =
+                        `📍 אשר: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+                });
+            } else {
+                // רענן מפה (גודל יכול להיות שגוי לאחר display:none)
+                setTimeout(() => pickMap.invalidateSize(), 100);
+                if (pickMarker) { pickMap.removeLayer(pickMarker); pickMarker = null; }
+            }
+        }
+
+        function confirmPickedLocation() {
+            if (!pickedLatLng) return;
+            document.getElementById('map-modal').classList.remove('open');
+            if (pickResolve) pickResolve({ lat: pickedLatLng.lat, lng: pickedLatLng.lng });
+        }
+
+        function cancelMapPick() {
+            document.getElementById('map-modal').classList.remove('open');
+            if (pickReject) pickReject(new Error('ביטול'));
+        }
+        // ===========================
+
         async function activateSystem() {
             const name = document.getElementById('userName').value.trim();
             const city = document.getElementById('userCity').value;
@@ -281,21 +425,21 @@
             const btn = document.getElementById('activateBtn');
             btn.disabled = true;
             btn.innerHTML = 'מתחבר... <span class="spinner"></span>';
-            setStatus('מאתר מיקום...', 'status-loading');
             document.getElementById('permHint').classList.remove('show');
 
             try {
-                const pos = await new Promise((resolve, reject) =>
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 12000, enableHighAccuracy: true })
-                ).catch(() => { document.getElementById('permHint').classList.add('show'); throw new Error("לא ניתן לקבל מיקום GPS — אנא אפשר הרשאות מיקום"); });
+                // שלב 1: מיקום — GPS או ידני
+                const loc = await getLocationWithFallback();
 
-                setStatus('מבקש הרשאות...', 'status-loading');
+                // שלב 2: הרשאות התראות
+                setStatus('מבקש הרשאות התראות...', 'status-loading');
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') {
                     document.getElementById('permHint').classList.add('show');
-                    throw new Error("יש לאשר התראות כדי לקבל צבע אדום");
+                    throw new Error("יש לאשר התראות כדי לקבל התראות צבע אדום");
                 }
 
+                // שלב 3: רישום FCM
                 setStatus('רושם למערכת...', 'status-loading');
                 const swReg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
                 const token = await messaging.getToken({
@@ -304,10 +448,11 @@
                 });
                 if (!token) throw new Error("לא ניתן לקבל token — נסה שוב");
 
+                // שלב 4: שמירה ב-Firestore
                 await db.collection('tokens').doc(token).set({
                     name, city,
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude,
+                    lat: loc.lat,
+                    lng: loc.lng,
                     token,
                     status: null,
                     statusTime: null,
@@ -321,8 +466,12 @@
                 showActiveState();
 
             } catch (err) {
-                setStatus('❌ שגיאה', 'status-error');
-                alert("שגיאה: " + (err.message || err));
+                if (err.message === 'ביטול') {
+                    setStatus('הרישום בוטל', '');
+                } else {
+                    setStatus('❌ שגיאה', 'status-error');
+                    alert("שגיאה: " + (err.message || err));
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'הפעל הגנה ודיווח מיקום';
@@ -352,8 +501,12 @@
             const btn = document.querySelector(`.status-btn.${status}`);
             if (btn) btn.classList.add('active');
 
+            // עדכן כותרת לאפשרות שינוי
+            const lbl = document.getElementById('statusPanelLabel');
+            if (lbl) lbl.textContent = 'סטטוס עודכן — לחץ שוב כדי לשנות:';
+
             const bar = document.getElementById('currentStatusBar');
-            bar.textContent = `הסטטוס הנוכחי שלך: ${labels[status]}`;
+            bar.textContent = `הסטטוס הנוכחי: ${labels[status]}`;
             bar.className = `current-status-bar ${status}`;
             bar.style.display = 'block';
         }
