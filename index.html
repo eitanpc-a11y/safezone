@@ -2,34 +2,46 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>SafeZone Admin - מפת שליטה</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SafeZone - אפליקציית צוות</title>
+    
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
-        #map { height: 100vh; width: 100%; }
-        .admin-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); width: 220px; }
-        .btn-test { background: #e74c3c; color: white; border: none; padding: 10px; width: 100%; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .user-count { font-weight: bold; color: #e67e22; }
+        :root { --primary: #e67e22; --dark: #1a1a1a; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--dark); color: white; text-align: center; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { width: 90%; max-width: 400px; background: #2c3e50; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; font-size: 1rem; box-sizing: border-box; }
+        .btn { background: var(--primary); color: white; border: none; padding: 15px; font-size: 1.1rem; border-radius: 50px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        #status { margin-top: 20px; font-weight: bold; }
+        #loc-info { color: var(--primary); font-size: 0.9rem; margin-top: 5px; }
     </style>
 </head>
 <body>
+    <div class="card">
+        <h1>🛡️ SafeZone</h1>
+        <p>מערכת הגנה לצוותי חירום</p>
+        
+        <input type="text" id="userName" placeholder="שם מלא">
+        <select id="userCity">
+            <option value="">בחר עיר מגורים/עבודה</option>
+            <option value="יהוד-מונוסון">יהוד-מונוסון</option>
+            <option value="חולון">חולון</option>
+            <option value="תל אביב - יפו">תל אביב - יפו</option>
+            <option value="אור יהודה">אור יהודה</option>
+        </select>
 
-    <div class="admin-panel">
-        <h2>🛡️ מפת בקרה SafeZone</h2>
-        <div>אנשי צוות: <span id="count" class="user-count">0</span></div>
-        <button class="btn-test" onclick="sendTestAlert()">🚨 הפעל ניסוי צופר</button>
+        <button class="btn" id="activateBtn" onclick="activateSystem()">הפעל הגנה ודיווח מיקום</button>
+        
+        <div id="status">המערכת לא פעילה</div>
+        <div id="loc-info"></div>
     </div>
-
-    <div id="map"></div>
 
     <script>
         const firebaseConfig = {
-            apiKey: "gyKZFrNtLB3we67OY8_iohg6h9TtmRBlpMP1bj1DY_k",
+            apiKey: "AIzaSyDLKF30weC2z70WvK3zvDoOqIVWYfoQ9ow",
             authDomain: "safezone-cd4b5.firebaseapp.com",
             projectId: "safezone-cd4b5",
             storageBucket: "safezone-cd4b5.appspot.com",
@@ -38,37 +50,47 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const messaging = firebase.messaging();
 
-        const map = L.map('map').setView([32.0853, 34.7818], 9);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        async function activateSystem() {
+            const name = document.getElementById('userName').value;
+            const selectedCity = document.getElementById('userCity').value;
 
-        let markers = {};
+            if(!name || !selectedCity) return alert("נא למלא שם ולבחור עיר");
 
-        db.collection('tokens').onSnapshot((snapshot) => {
-            document.getElementById('count').innerText = snapshot.size;
-            snapshot.docChanges().forEach((change) => {
-                const data = change.doc.data();
-                const id = change.doc.id;
-                if (data.lat && data.lng) {
-                    if (markers[id]) {
-                        markers[id].setLatLng([data.lat, data.lng]);
-                    } else {
-                        markers[id] = L.marker([data.lat, data.lng]).addTo(map)
-                            .bindPopup(`<b>עיר:</b> ${data.city}<br><b>זמן:</b> ${data.lastSeen ? data.lastSeen.toDate().toLocaleTimeString() : 'עכשיו'}`);
-                    }
-                }
-            });
-        });
-
-        async function sendTestAlert() {
-            if(!confirm("לשלוח הודעת בדיקה לכל הצוות?")) return;
             try {
-                // הקישור המעודכן לשרת ב-us-central1
-                const response = await fetch('https://us-central1-safezone-cd4b5.cloudfunctions.net/sendManualAlert');
-                const result = await response.text();
-                alert(result);
+                // 1. קבלת מיקום GPS מדויק
+                const pos = await new Promise((res, rej) => {
+                    navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000 });
+                });
+                const { latitude, longitude } = pos.coords;
+
+                // 2. הרשאה להתראות
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') throw "יש לאשר התראות כדי לקבל צבע אדום";
+
+                const sw = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+                const token = await messaging.getToken({ 
+                    serviceWorkerRegistration: sw,
+                    vapidKey: "BIXCZU-c8gIaA5JScoc7-wDLWKZErE9YM1-NKt0ot0UZq6c6iGKWQgxBHaFzquGlyjL6pMwpV-vH0NOq6XmxZGo"
+                });
+
+                // 3. שמירה ל-Database
+                await db.collection('tokens').doc(token).set({
+                    name: name,
+                    city: selectedCity,
+                    lat: latitude,
+                    lng: longitude,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                document.getElementById('status').innerText = "✅ הגנה פעילה";
+                document.getElementById('status').style.color = "#2ecc71";
+                document.getElementById('loc-info').innerText = `מיקום GPS נקלט בהצלחה`;
+                alert("נרשמת בהצלחה! המיקום שלך מעודכן במפה.");
+
             } catch (e) {
-                alert("שגיאה בחיבור לשרת הניסוי");
+                alert("שגיאה: " + e);
             }
         }
     </script>
