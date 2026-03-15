@@ -281,6 +281,9 @@
 
         <div id="status">המערכת לא פעילה</div>
         <div id="loc-info"></div>
+        <button id="updateLocBtn" onclick="updateLocation()" style="display:none; margin-top:6px; background:none; border:none; color:var(--text-muted); font-size:0.78rem; cursor:pointer; text-decoration:underline; font-family:inherit;">
+            📍 עדכן מיקום ידנית
+        </button>
 
         <div class="permission-hint" id="permHint">
             ⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן.
@@ -349,6 +352,36 @@
         const messaging = firebase.messaging();
 
         let currentToken = localStorage.getItem('safezone_token');
+        let locationWatchId = null;  // מזהה מעקב GPS
+        let lastLocUpdate   = 0;     // מניעת עדכונים תכופים מדי
+
+        // ===== מעקב GPS בזמן אמת =====
+        function startLocationTracking(token) {
+            if (!navigator.geolocation || locationWatchId !== null) return;
+            locationWatchId = navigator.geolocation.watchPosition(
+                async (pos) => {
+                    const now = Date.now();
+                    if (now - lastLocUpdate < 30000) return; // עדכן לכל היותר כל 30 שניות
+                    lastLocUpdate = now;
+                    try {
+                        await db.collection('tokens').doc(token).update({
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } catch(e) {}
+                },
+                (err) => { console.log('GPS watch:', err.message); },
+                { enableHighAccuracy: true, maximumAge: 20000, timeout: 15000 }
+            );
+        }
+
+        function stopLocationTracking() {
+            if (locationWatchId !== null) {
+                navigator.geolocation.clearWatch(locationWatchId);
+                locationWatchId = null;
+            }
+        }
 
         // בדיקת URL params — מהנוטיפיקציה
         const urlParams = new URLSearchParams(window.location.search);
@@ -357,7 +390,8 @@
 
         if (currentToken) {
             showActiveState();
-            startDocListener(currentToken); // הקשב לשינויים מהאדמין
+            startLocationTracking(currentToken); // מעקב GPS בזמן אמת
+            startDocListener(currentToken);       // הקשב לשינויים מהאדמין
             if (autoStatus) {
                 unlockButtons(false);
                 setTimeout(() => reportStatus(autoStatus), 600);
@@ -457,6 +491,7 @@
             document.getElementById('register-panel').style.display = 'none';
             document.getElementById('status-panel').style.display = 'block';
             document.getElementById('deactivateBtn').style.display = 'block';
+            document.getElementById('updateLocBtn').style.display = 'inline-block';
 
             // שחזר מצב נעילה
             const savedStatus = localStorage.getItem('safezone_status');
@@ -530,6 +565,27 @@
             document.getElementById('map-modal').classList.remove('open');
             if (pickReject) pickReject(new Error('ביטול'));
         }
+
+        // ===== עדכון מיקום ידני אחרי רישום =====
+        async function updateLocation() {
+            if (!currentToken) return;
+            const btn = document.getElementById('updateLocBtn');
+            btn.textContent = '📍 בוחר מיקום...';
+
+            try {
+                // פתח מפה לבחירה ידנית ישירות — ללא ניסיון GPS
+                const loc = await new Promise((resolve, reject) => openMapPicker(resolve, reject));
+                await db.collection('tokens').doc(currentToken).update({
+                    lat: loc.lat,
+                    lng: loc.lng
+                });
+                btn.textContent = '✅ מיקום עודכן!';
+                setTimeout(() => { btn.textContent = '📍 עדכן מיקום ידנית'; }, 2500);
+            } catch(e) {
+                if (e.message !== 'ביטול') alert('שגיאה בעדכון מיקום: ' + e.message);
+                btn.textContent = '📍 עדכן מיקום ידנית';
+            }
+        }
         // ===========================
 
         async function activateSystem() {
@@ -580,7 +636,8 @@
                 localStorage.setItem('safezone_name', name);
                 localStorage.setItem('safezone_city', city);
                 showActiveState();
-                startDocListener(token); // הקשב לשינויים מהאדמין
+                startLocationTracking(token); // מעקב GPS בזמן אמת
+                startDocListener(token);       // הקשב לשינויים מהאדמין
 
             } catch (err) {
                 if (err.message === 'ביטול') {
@@ -649,6 +706,9 @@
             document.getElementById('register-panel').style.display = 'block';
             document.getElementById('status-panel').style.display = 'none';
             document.getElementById('deactivateBtn').style.display = 'none';
+            document.getElementById('updateLocBtn').style.display = 'none';
+            stopLocationTracking(); // עצור מעקב GPS
+            if (docUnsubscribe) { docUnsubscribe(); docUnsubscribe = null; }
             btn.disabled = false;
             btn.textContent = 'בטל רישום מהמערכת';
         }
