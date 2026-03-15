@@ -357,12 +357,11 @@
 
         if (currentToken) {
             showActiveState();
+            startDocListener(currentToken); // הקשב לשינויים מהאדמין
             if (autoStatus) {
-                // לחיצה על כפתור בנוטיפיקציה — פתח כפתורים ודווח אוטומטית
                 unlockButtons(false);
                 setTimeout(() => reportStatus(autoStatus), 600);
             } else if (alertParam === '1') {
-                // לחיצה על גוף הנוטיפיקציה — פתח כפתורים לבחירה
                 unlockButtons(true);
             }
         }
@@ -384,6 +383,27 @@
                 showAlertBanner();
             }
         });
+
+        // ===== הקשבה ל-Firestore — אדמין ניקה סטטוס ("סיים טיפול") =====
+        let docUnsubscribe = null;
+        function startDocListener(token) {
+            if (docUnsubscribe) docUnsubscribe(); // בטל האזנה קודמת
+            docUnsubscribe = db.collection('tokens').doc(token).onSnapshot(function(doc) {
+                if (!doc.exists) return;
+                const data = doc.data();
+                const isLocked = localStorage.getItem('safezone_locked') === '1';
+                // אם הסטטוס נוקה ע"י האדמין והכפתורים נעולים — פתח לדיווח חוזר
+                if ((data.status === null || data.status === undefined) && isLocked) {
+                    unlockButtons(false);
+                    // הצג הודעה קצרה
+                    const lbl = document.getElementById('statusPanelLabel');
+                    if (lbl) {
+                        lbl.textContent = '✅ הדיווח טופל — תוכל לדווח שוב אם נדרש';
+                        lbl.className = 'status-label';
+                    }
+                }
+            });
+        }
 
         function showAlertBanner() {
             const b = document.getElementById('alert-banner');
@@ -560,6 +580,7 @@
                 localStorage.setItem('safezone_name', name);
                 localStorage.setItem('safezone_city', city);
                 showActiveState();
+                startDocListener(token); // הקשב לשינויים מהאדמין
 
             } catch (err) {
                 if (err.message === 'ביטול') {

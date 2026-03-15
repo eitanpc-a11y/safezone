@@ -215,6 +215,9 @@
                     <span>🛡️ SafeZone Control</span>
                     <span class="logout-link" onclick="logout()">יציאה</span>
                 </div>
+                <div id="db-status" style="font-size:0.75rem;color:#555;margin-bottom:6px;text-align:center;">
+                    ⏳ מתחבר ל-Firestore...
+                </div>
 
                 <div class="stats-row">
                     <div class="stat-box safe">
@@ -271,13 +274,15 @@
     let allDocs = {}; // docId -> data
     let markers = {}; // docId -> leaflet marker
     let safeTimers = {};
+    let doneDocs = new Set(); // אנשים שטופלו — מוסתרים עד לדיווח חדש
 
     function checkPassword() {
         const pass = document.getElementById('adminPass').value;
         if (pass === ADMIN_PASSWORD) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('admin-screen').style.display = 'block';
-            initAdmin();
+            // עיכוב קצר כדי שהדפדפן יספיק לרנדר את ה-div לפני Leaflet
+            setTimeout(initAdmin, 50);
         } else {
             document.getElementById('loginError').style.display = 'block';
             document.getElementById('adminPass').value = '';
@@ -326,35 +331,39 @@
 
     function buildPersonsList() {
         const container = document.getElementById('personsList');
-        const visible = Object.entries(allDocs).filter(([id, data]) => !shouldHide(data));
+
+        // הצג רק אנשים שדיווחו סטטוס ולא טופלו עדיין
+        const visible = Object.entries(allDocs).filter(([id, data]) => {
+            if (doneDocs.has(id)) return false;      // טופל — מוסתר
+            if (shouldHide(data)) return false;       // בטוח >20 דק
+            return data.status !== null && data.status !== undefined; // חייב דיווח
+        });
 
         if (visible.length === 0) {
-            container.innerHTML = '<div class="empty-state">אין דיווחים כרגע<br>ממתין לנתונים...</div>';
+            container.innerHTML = '<div class="empty-state">אין דיווחים פעילים<br>ממתין לדיווחי צוות...</div>';
             updateCounts();
             return;
         }
 
-        // Sort: help first, then onway, then safe, then none
-        const order = { help: 0, onway: 1, safe: 2, none: 3 };
-        visible.sort(([,a],[,b]) => (order[a.status||'none']||3) - (order[b.status||'none']||3));
+        // מיון: עזרה → בדרך → בטוח
+        const order = { help: 0, onway: 1, safe: 2 };
+        visible.sort(([,a],[,b]) => (order[a.status]??9) - (order[b.status]??9));
 
         container.innerHTML = visible.map(([id, data]) => {
             const status = data.status || 'none';
             const elapsed = formatElapsed(data.statusTime);
-            const wazeUrl = data.lat && data.lng
-                ? `https://waze.com/ul?ll=${data.lat},${data.lng}&navigate=yes`
-                : '#';
+            const safeId = encodeURIComponent(id);
 
             return `
-                <div class="person-card status-${status}" id="card-${id}">
+                <div class="person-card status-${status}" id="card-${safeId}">
                     <div class="card-top">
                         <div class="person-name">${data.name || 'אנונימי'}</div>
                         <div class="person-time">${elapsed}</div>
                     </div>
                     <div class="person-status-text ${status}">${statusLabel(status)}</div>
                     <div class="card-actions">
-                        <button class="btn-waze" onclick="openWaze('${data.lat}','${data.lng}')">Waze</button>
-                        <button class="btn-done" onclick="markDone('${id}')">סיים טיפול</button>
+                        <button class="btn-waze" data-lat="${data.lat||''}" data-lng="${data.lng||''}">🗺 Waze</button>
+                        <button class="btn-done" data-id="${safeId}">✅ סיים טיפול</button>
                     </div>
                 </div>
             `;
@@ -377,13 +386,13 @@
     }
 
     function updateMarker(id, data) {
-        if (shouldHide(data)) {
+        // הסר מרקר אם: טופל, בטוח >20 דק, אין סטטוס, או אין מיקום
+        if (doneDocs.has(id) || shouldHide(data) || !data.status || !data.lat || !data.lng) {
             if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
             return;
         }
-        if (!data.lat || !data.lng) return;
 
-        const status = data.status || 'none';
+        const status = data.status;
         const icon = createMarkerIcon(status);
         const popup = `<b>${data.name||'אנונימי'}</b><br>${data.city||''}<br>${statusLabel(status)}`;
 
@@ -426,12 +435,18 @@
         window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
     }
 
-    async function markDone(id) {
+    async function markDone(safeId) {
+        const id = decodeURIComponent(safeId);
         try {
-            await db.collection('tokens').doc(id).update({ status: null, statusTime: null });
-            if (allDocs[id]) allDocs[id] = { ...allDocs[id], status: null, statusTime: null };
+            // עדכן Firestore — זה יפתח את הכפתורים אצל המשתמש
+            await db.collection('tokens').doc(id).update({
+                status: null,
+                statusTime: null
+            });
+            // הסתר מקומית עד לדיווח חדש
+            doneDocs.add(id);
+            if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
             buildPersonsList();
-            updateMarker(id, allDocs[id] || {});
         } catch(e) { alert("שגיאה: " + e.message); }
     }
 
@@ -464,24 +479,56 @@
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // Update time labels every minute
+        // תיקון גודל מפה — חשוב כשמאותחלת בתוך div מוסתר
+        setTimeout(() => map.invalidateSize(), 100);
+        setTimeout(() => map.invalidateSize(), 500);
+
+        // עדכון תוויות זמן כל דקה
         setInterval(() => { if (Object.keys(allDocs).length) buildPersonsList(); }, 60000);
+
+        // ===== Event delegation לכפתורי Waze ו"סיים טיפול" =====
+        document.getElementById('personsList').addEventListener('click', function(e) {
+            const wazeBtn = e.target.closest('.btn-waze');
+            const doneBtn = e.target.closest('.btn-done');
+            if (wazeBtn) {
+                openWaze(wazeBtn.dataset.lat, wazeBtn.dataset.lng);
+            } else if (doneBtn) {
+                markDone(doneBtn.dataset.id);
+            }
+        });
 
         let firstLoad = true;
 
         db.collection('tokens').onSnapshot(snapshot => {
+            // עדכן סטטוס חיבור
+            const total = snapshot.size;
+            const dbEl = document.getElementById('db-status');
+            if (dbEl) {
+                dbEl.textContent = total > 0
+                    ? `✅ מחובר — ${total} אנש${total === 1 ? '' : 'ים'} רשומ${total === 1 ? '' : 'ים'}`
+                    : '✅ מחובר — אין רשומים עדיין';
+                dbEl.style.color = '#2ecc71';
+            }
+
             snapshot.docChanges().forEach(change => {
                 const id = change.doc.id;
                 const data = change.doc.data();
 
                 if (change.type === 'removed') {
                     delete allDocs[id];
+                    doneDocs.delete(id);
                     if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
                     if (safeTimers[id]) { clearTimeout(safeTimers[id]); delete safeTimers[id]; }
                     return;
                 }
 
                 allDocs[id] = data;
+
+                // אם דיווח חדש הגיע — הסר מ-doneDocs והצג שוב
+                if (data.status && doneDocs.has(id)) {
+                    doneDocs.delete(id);
+                }
+
                 updateMarker(id, data);
 
                 if (data.status === 'safe') scheduleRemoval(id, data);
@@ -493,7 +540,13 @@
             // מרכז מפה אוטומטית בטעינה ראשונה
             if (firstLoad && Object.keys(markers).length > 0) {
                 firstLoad = false;
-                setTimeout(fitMapToMarkers, 300);
+                setTimeout(fitMapToMarkers, 400);
+            }
+        }, err => {
+            const dbEl = document.getElementById('db-status');
+            if (dbEl) {
+                dbEl.textContent = '❌ שגיאת חיבור: ' + err.message;
+                dbEl.style.color = '#e74c3c';
             }
         });
     }
