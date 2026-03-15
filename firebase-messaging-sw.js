@@ -1,9 +1,3 @@
-// ============================================================
-// Firebase Messaging Service Worker
-// קובץ זה חייב להיות בשם firebase-messaging-sw.js
-// ולהיות בתיקיית השורש של הפרויקט
-// ============================================================
-
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
@@ -19,49 +13,53 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // טיפול בהתראות שמגיעות כשהאפליקציה ברקע
-messaging.onBackgroundMessage((payload) => {
-    console.log('[SW] התראה ברקע:', payload);
+messaging.onBackgroundMessage(function(payload) {
+    const title = payload.notification?.title || '🚨 צבע אדום!';
+    const body  = payload.notification?.body  || 'אזעקה באזורך — היכנס למרחב מוגן';
 
-    const title = payload.notification?.title || "🚨 SafeZone Alert";
-    const body  = payload.notification?.body  || "בדוק את האפליקציה";
-    const type  = payload.data?.type || 'unknown';
-
-    const options = {
+    self.registration.showNotification(title, {
         body: body,
-        icon: 'https://cdn-icons-png.flaticon.com/512/564/564619.png',
-        badge: 'https://cdn-icons-png.flaticon.com/512/564/564619.png',
-        vibrate: type === 'red_alert' ? [500, 100, 500, 100, 500] : [200, 100, 200],
-        requireInteraction: type === 'red_alert', // השאר נוטיפיקציית צבע אדום על המסך עד לאישור
-        data: {
-            url: './index.html',
-            type: type
-        },
-        actions: type === 'red_alert' ? [
-            { action: 'open', title: 'פתח SafeZone' }
-        ] : []
-    };
-
-    return self.registration.showNotification(title, options);
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-72.png',
+        vibrate: [300, 100, 300, 100, 300],
+        requireInteraction: true,
+        tag: 'safezone-alert',
+        renotify: true,
+        dir: 'rtl',
+        lang: 'he',
+        actions: [
+            { action: 'safe',  title: '✅ אני בטוח' },
+            { action: 'onway', title: '🚗 אני בדרך' },
+            { action: 'help',  title: '🆘 זקוק לעזרה' }
+        ],
+        data: payload.data || {}
+    });
 });
 
-// טיפול בלחיצה על הנוטיפיקציה
-self.addEventListener('notificationclick', (event) => {
+// טיפול בלחיצה על הנוטיפיקציה וכפתורי הפעולה
+self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
-    const url = event.notification.data?.url || './index.html';
+    const action = event.action;
+    let url = '/';
+
+    if (action === 'safe')       url = '/?status=safe';
+    else if (action === 'onway') url = '/?status=onway';
+    else if (action === 'help')  url = '/?status=help';
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // אם האפליקציה כבר פתוחה — עבור אליה
-            for (const client of clientList) {
-                if (client.url.includes('index.html') && 'focus' in client) {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            for (const client of windowClients) {
+                if ('focus' in client) {
+                    client.navigate(url);
                     return client.focus();
                 }
             }
-            // אחרת — פתח חלון חדש
-            if (clients.openWindow) {
-                return clients.openWindow(url);
-            }
+            if (clients.openWindow) return clients.openWindow(url);
         })
     );
+});
+
+self.addEventListener('activate', function(event) {
+    event.waitUntil(clients.claim());
 });
