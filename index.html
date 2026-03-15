@@ -354,25 +354,32 @@
         let currentToken = localStorage.getItem('safezone_token');
         let locationWatchId = null;  // מזהה מעקב GPS
         let lastLocUpdate   = 0;     // מניעת עדכונים תכופים מדי
+        let docUnsubscribe  = null;  // Firestore listener — חייב להיות כאן לפני כל שימוש
 
         // ===== מעקב GPS בזמן אמת =====
         function startLocationTracking(token) {
             if (!navigator.geolocation || locationWatchId !== null) return;
             locationWatchId = navigator.geolocation.watchPosition(
                 async (pos) => {
+                    // סנן מיקומי IP גרידא (דיוק > 1000 מטר = לא GPS אמיתי)
+                    if (pos.coords.accuracy > 1000) {
+                        console.log('GPS: דיוק נמוך (' + Math.round(pos.coords.accuracy) + 'm) — מדלג');
+                        return;
+                    }
                     const now = Date.now();
                     if (now - lastLocUpdate < 30000) return; // עדכן לכל היותר כל 30 שניות
                     lastLocUpdate = now;
+                    console.log('GPS: עדכון מיקום (' + pos.coords.accuracy.toFixed(0) + 'm דיוק)');
                     try {
                         await db.collection('tokens').doc(token).update({
                             lat: pos.coords.latitude,
                             lng: pos.coords.longitude,
                             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                    } catch(e) {}
+                    } catch(e) { console.log('שגיאת Firestore:', e.message); }
                 },
-                (err) => { console.log('GPS watch:', err.message); },
-                { enableHighAccuracy: true, maximumAge: 20000, timeout: 15000 }
+                (err) => { console.log('GPS שגיאה:', err.message); },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
             );
         }
 
@@ -419,7 +426,6 @@
         });
 
         // ===== הקשבה ל-Firestore — אדמין ניקה סטטוס ("סיים טיפול") =====
-        let docUnsubscribe = null;
         function startDocListener(token) {
             if (docUnsubscribe) docUnsubscribe(); // בטל האזנה קודמת
             docUnsubscribe = db.collection('tokens').doc(token).onSnapshot(function(doc) {
