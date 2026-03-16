@@ -622,21 +622,20 @@
             return null;
         }
 
+        // Proxy שלנו — מסיר CORS ומשתמש ב-IP ישראלי
+        const ALERT_PROXY_URL = 'https://me-west1-safezone-cd4b5.cloudfunctions.net/getAlertProxy';
+
         async function checkAlertForUser() {
             if (!currentToken) return;
             try {
-                const res = await fetch('https://www.oref.org.il/WarningMessages/alert.json', {
-                    headers: {
-                        'Referer': 'https://www.oref.org.il/',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
+                const res = await fetch(ALERT_PROXY_URL);
                 if (!res.ok) return;
                 const text = await res.text();
                 if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === 'null') return;
 
-                const alertObj = JSON.parse(text);
-                if (!alertObj || !alertObj.data) return;
+                let alertObj;
+                try { alertObj = JSON.parse(text); } catch(e) { return; }
+                if (!alertObj || alertObj._error || !alertObj.data) return;
 
                 const cities  = Array.isArray(alertObj.data) ? alertObj.data : [alertObj.data];
                 const alertId = alertObj.id || cities.join(',');
@@ -689,7 +688,7 @@
         function startUserAlertPolling() {
             if (alertPollTimer) return;
             checkAlertForUser(); // בדוק מיד
-            alertPollTimer = setInterval(checkAlertForUser, 15000);
+            alertPollTimer = setInterval(checkAlertForUser, 10000); // כל 10 שניות
         }
 
         function stopUserAlertPolling() {

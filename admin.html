@@ -234,8 +234,11 @@
                 <div id="db-status" style="font-size:0.75rem;color:#555;margin-bottom:6px;text-align:center;">
                     ⏳ מתחבר ל-Firestore...
                 </div>
-                <div id="alert-monitor" class="alert-monitor">
-                    ⏳ מאתחל ניטור אזעקות...
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <div id="alert-monitor" class="alert-monitor" style="flex:1">
+                        ⏳ מאתחל ניטור אזעקות...
+                    </div>
+                    <button onclick="testProxyConnection()" style="padding:4px 10px;font-size:0.75rem;background:#1a1a2e;border:1px solid #333;color:#aaa;border-radius:6px;cursor:pointer;white-space:nowrap;">🔍 בדוק חיבור</button>
                 </div>
 
                 <div class="stats-row">
@@ -496,16 +499,13 @@
     let lastDetectedAlertId = '';
     let monitorInterval = null;
 
+    // Proxy שלנו — פותר CORS וחסימת IP
+    const ALERT_PROXY_URL = 'https://me-west1-safezone-cd4b5.cloudfunctions.net/getAlertProxy';
+
     async function checkOrefAlert() {
         const el = document.getElementById('alert-monitor');
-        const OREF_URL = 'https://www.oref.org.il/WarningMessages/alert.json';
         try {
-            const res = await fetch(OREF_URL, {
-                headers: {
-                    'Referer': 'https://www.oref.org.il/',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
+            const res = await fetch(ALERT_PROXY_URL);
 
             if (!res.ok) {
                 if (el) { el.className = 'alert-monitor error'; el.textContent = `⚠️ API לא זמין (${res.status})`; }
@@ -513,22 +513,31 @@
             }
 
             const text = await res.text();
+            const t = new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+            let alertObj;
+            try { alertObj = JSON.parse(text); } catch(e) { alertObj = null; }
+
+            // Proxy לא הצליח לגשת ל-oref
+            if (alertObj && alertObj._error) {
+                if (el) {
+                    el.className = 'alert-monitor error';
+                    el.textContent = `⚠️ שרת ת"א חסום — בדוק חיבור (${t})`;
+                }
+                return;
+            }
 
             // תגובה ריקה = אין אזעקה פעילה כרגע
-            if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === 'null') {
+            if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === 'null' ||
+                !alertObj || !alertObj.data || (Array.isArray(alertObj.data) && alertObj.data.length === 0)) {
                 if (el) {
                     el.className = 'alert-monitor';
-                    const t = new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
                     el.textContent = `🟢 מאזין — ללא אזעקות (${t})`;
                 }
                 return;
             }
 
-            const alert = JSON.parse(text);
-            if (!alert || !alert.data || (Array.isArray(alert.data) && alert.data.length === 0)) {
-                if (el) { el.className = 'alert-monitor'; el.textContent = '🟢 מאזין — ללא אזעקות'; }
-                return;
-            }
+            const alert = alertObj;
 
             const cities  = Array.isArray(alert.data) ? alert.data : [alert.data];
             const alertId = alert.id || cities.join(',') + '_' + Date.now();
@@ -565,9 +574,29 @@
         }
     }
 
+    async function testProxyConnection() {
+        const el = document.getElementById('alert-monitor');
+        if (el) { el.className = 'alert-monitor'; el.textContent = '🔄 בודק חיבור ל-proxy...'; }
+        try {
+            const res = await fetch('https://me-west1-safezone-cd4b5.cloudfunctions.net/testOrefAccess');
+            const data = await res.json();
+            if (el) {
+                if (data.ok) {
+                    el.className = 'alert-monitor';
+                    el.textContent = `✅ חיבור תקין! שרת ת"א מגיע ל-oref (status ${data.status})`;
+                } else {
+                    el.className = 'alert-monitor error';
+                    el.textContent = `❌ שרת ת"א חסום: ${data.error}`;
+                }
+            }
+        } catch(e) {
+            if (el) { el.className = 'alert-monitor error'; el.textContent = '❌ לא ניתן להגיע לפונקציה: ' + e.message; }
+        }
+    }
+
     function startAlertMonitor() {
         checkOrefAlert(); // הרץ מיד
-        monitorInterval = setInterval(checkOrefAlert, 15000); // כל 15 שניות
+        monitorInterval = setInterval(checkOrefAlert, 10000); // כל 10 שניות
     }
 
     function initAdmin() {
