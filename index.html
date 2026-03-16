@@ -558,32 +558,33 @@
         const db = firebase.firestore();
         const messaging = firebase.messaging();
 
-        let currentToken = localStorage.getItem('safezone_token');
-        let locationWatchId = null;  // מזהה מעקב GPS
-        let lastLocUpdate   = 0;     // מניעת עדכונים תכופים מדי
-        let docUnsubscribe  = null;  // Firestore listener — חייב להיות כאן לפני כל שימוש
+        let currentToken    = localStorage.getItem('safezone_token');
+        let locationWatchId = null;
+        let lastLocUpdate   = 0;
+        let docUnsubscribe  = null;
+        let lastKnownLat    = null;  // מיקום נוכחי של המשתמש
+        let lastKnownLng    = null;
+        let lastUserAlertId = '';    // למניעת כפילויות בבדיקת אזעקות
+        let alertPollTimer  = null;
 
         // ===== מעקב GPS בזמן אמת =====
         function startLocationTracking(token) {
             if (!navigator.geolocation || locationWatchId !== null) return;
             locationWatchId = navigator.geolocation.watchPosition(
                 async (pos) => {
-                    // סנן מיקומי IP גרידא (דיוק > 1000 מטר = לא GPS אמיתי)
-                    if (pos.coords.accuracy > 1000) {
-                        console.log('GPS: דיוק נמוך (' + Math.round(pos.coords.accuracy) + 'm) — מדלג');
-                        return;
-                    }
+                    if (pos.coords.accuracy > 1000) return;
+                    lastKnownLat = pos.coords.latitude;
+                    lastKnownLng = pos.coords.longitude;
                     const now = Date.now();
-                    if (now - lastLocUpdate < 30000) return; // עדכן לכל היותר כל 30 שניות
+                    if (now - lastLocUpdate < 30000) return;
                     lastLocUpdate = now;
-                    console.log('GPS: עדכון מיקום (' + pos.coords.accuracy.toFixed(0) + 'm דיוק)');
                     try {
                         await db.collection('tokens').doc(token).update({
-                            lat: pos.coords.latitude,
-                            lng: pos.coords.longitude,
+                            lat: lastKnownLat,
+                            lng: lastKnownLng,
                             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                    } catch(e) { console.log('שגיאת Firestore:', e.message); }
+                    } catch(e) {}
                 },
                 (err) => { console.log('GPS שגיאה:', err.message); },
                 { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
@@ -597,6 +598,104 @@
             }
         }
 
+        // ===== ניטור אזעקות מהטלפון (IP ישראלי — לא נחסם) =====
+        function haversineKmUser(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 +
+                      Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        async function geocodeCityUser(city) {
+            try {
+                const res = await fetch(
+                    'https://nominatim.openstreetmap.org/search?q=' +
+                    encodeURIComponent(city) + '&countrycodes=il&format=json&limit=1'
+                );
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                }
+            } catch(e) {}
+            return null;
+        }
+
+        async function checkAlertForUser() {
+            if (!currentToken) return;
+            try {
+                const res = await fetch('https://www.oref.org.il/WarningMessages/alert.json', {
+                    headers: {
+                        'Referer': 'https://www.oref.org.il/',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                if (!res.ok) return;
+                const text = await res.text();
+                if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === 'null') return;
+
+                const alertObj = JSON.parse(text);
+                if (!alertObj || !alertObj.data) return;
+
+                const cities  = Array.isArray(alertObj.data) ? alertObj.data : [alertObj.data];
+                const alertId = alertObj.id || cities.join(',');
+                if (alertId === lastUserAlertId) return;
+                lastUserAlertId = alertId;
+
+                console.log('[UserPoll] אזעקה:', cities);
+
+                // בדוק אם המשתמש קרוב לאחת הערים
+                const uLat = lastKnownLat;
+                const uLng = lastKnownLng;
+                let nearby = false;
+
+                for (const city of cities) {
+                    if (uLat && uLng) {
+                        const coords = await geocodeCityUser(city);
+                        if (coords && haversineKmUser(uLat, uLng, coords.lat, coords.lng) <= 10) {
+                            nearby = true; break;
+                        }
+                    } else {
+                        // fallback — השם שנרשם
+                        const storedCity = localStorage.getItem('safezone_city') || '';
+                        if (storedCity === city) { nearby = true; break; }
+                    }
+                }
+
+                if (!nearby) return;
+
+                // כתוב ל-Firestore → Cloud Function ישלח FCM לשאר הצוות
+                try {
+                    await db.collection('_meta').doc('currentAlert').set({
+                        alertId, cities,
+                        title: alertObj.title || 'צבע אדום',
+                        detectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        source: 'user_device'
+                    });
+                } catch(e) {}
+
+                // פתח כפתורים אם לא נעולים
+                if (localStorage.getItem('safezone_locked') !== '1') {
+                    unlockButtons(true);
+                    showAlertBanner();
+                }
+
+            } catch(e) {
+                // שקט — CORS או אין חיבור
+            }
+        }
+
+        function startUserAlertPolling() {
+            if (alertPollTimer) return;
+            checkAlertForUser(); // בדוק מיד
+            alertPollTimer = setInterval(checkAlertForUser, 15000);
+        }
+
+        function stopUserAlertPolling() {
+            if (alertPollTimer) { clearInterval(alertPollTimer); alertPollTimer = null; }
+        }
+
         // בדיקת URL params — מהנוטיפיקציה
         const urlParams = new URLSearchParams(window.location.search);
         const autoStatus = urlParams.get('status'); // לחיצה על כפתור בנוטיפיקציה
@@ -604,8 +703,9 @@
 
         if (currentToken) {
             showActiveState();
-            startLocationTracking(currentToken); // מעקב GPS בזמן אמת
-            startDocListener(currentToken);       // הקשב לשינויים מהאדמין
+            startLocationTracking(currentToken);
+            startDocListener(currentToken);
+            startUserAlertPolling(); // ניטור אזעקות מהטלפון
             if (autoStatus) {
                 unlockButtons(false);
                 setTimeout(() => reportStatus(autoStatus), 600);
@@ -849,8 +949,9 @@
                 localStorage.setItem('safezone_name', name);
                 localStorage.setItem('safezone_city', city);
                 showActiveState();
-                startLocationTracking(token); // מעקב GPS בזמן אמת
-                startDocListener(token);       // הקשב לשינויים מהאדמין
+                startLocationTracking(token);
+                startDocListener(token);
+                startUserAlertPolling();
 
             } catch (err) {
                 if (err.message === 'ביטול') {
@@ -920,7 +1021,8 @@
             document.getElementById('status-panel').style.display = 'none';
             document.getElementById('deactivateBtn').style.display = 'none';
             document.getElementById('updateLocBtn').style.display = 'none';
-            stopLocationTracking(); // עצור מעקב GPS
+            stopLocationTracking();
+            stopUserAlertPolling();
             if (docUnsubscribe) { docUnsubscribe(); docUnsubscribe = null; }
             btn.disabled = false;
             btn.textContent = 'בטל רישום מהמערכת';
