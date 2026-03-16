@@ -483,7 +483,7 @@
         const btn = document.getElementById('testBtn');
         btn.disabled = true; btn.textContent = 'שולח...';
         try {
-            const res = await fetch(`https://us-central1-safezone-cd4b5.cloudfunctions.net/sendManualAlert?key=${ADMIN_SECRET_KEY}`);
+            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/sendManualAlert?key=${ADMIN_SECRET_KEY}`);
             alert("✅ " + await res.text());
         } catch(e) { alert("❌ שגיאה: " + e.message); }
         finally { btn.disabled = false; btn.textContent = '🚨 ניסוי צופר'; }
