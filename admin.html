@@ -160,6 +160,22 @@
         }
         .btn-done:hover { background: #333; color: white; }
 
+        /* Alert monitor strip */
+        .alert-monitor {
+            font-size: 0.72rem; text-align: center; padding: 5px 8px;
+            border-radius: 6px; margin-bottom: 6px;
+            background: #0d1f0d; border: 1px solid #1a3a1a;
+            color: #4a9a4a; transition: all 0.3s;
+        }
+        .alert-monitor.active {
+            background: #3d0000; border-color: #7a0000; color: #ff6b6b;
+            animation: alertPulse 1s infinite;
+        }
+        .alert-monitor.error { background: #1a1200; border-color: #3a2800; color: #f39c12; }
+        @keyframes alertPulse {
+            0%, 100% { opacity: 1; } 50% { opacity: 0.7; }
+        }
+
         /* Test alert button */
         .panel-footer {
             padding: 10px 14px;
@@ -217,6 +233,9 @@
                 </div>
                 <div id="db-status" style="font-size:0.75rem;color:#555;margin-bottom:6px;text-align:center;">
                     ⏳ מתחבר ל-Firestore...
+                </div>
+                <div id="alert-monitor" class="alert-monitor">
+                    ⏳ מאתחל ניטור אזעקות...
                 </div>
 
                 <div class="stats-row">
@@ -470,6 +489,90 @@
         finally { btn.disabled = false; btn.textContent = '🚨 ניסוי צופר'; }
     }
 
+    // ─────────────────────────────────────────────────────────
+    // ניטור אזעקות — הדפדפן מאזין ל-API ישירות (IP ישראלי)
+    // כשמזוהה אזעקה חדשה → כתיבה ל-Firestore → Cloud Function
+    // ─────────────────────────────────────────────────────────
+    let lastDetectedAlertId = '';
+    let monitorInterval = null;
+
+    async function checkOrefAlert() {
+        const el = document.getElementById('alert-monitor');
+        const OREF_URL = 'https://www.oref.org.il/WarningMessages/alert.json';
+        try {
+            const res = await fetch(OREF_URL, {
+                headers: {
+                    'Referer': 'https://www.oref.org.il/',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (!res.ok) {
+                if (el) { el.className = 'alert-monitor error'; el.textContent = `⚠️ API לא זמין (${res.status})`; }
+                return;
+            }
+
+            const text = await res.text();
+
+            // תגובה ריקה = אין אזעקה פעילה כרגע
+            if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === 'null') {
+                if (el) {
+                    el.className = 'alert-monitor';
+                    const t = new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                    el.textContent = `🟢 מאזין — ללא אזעקות (${t})`;
+                }
+                return;
+            }
+
+            const alert = JSON.parse(text);
+            if (!alert || !alert.data || (Array.isArray(alert.data) && alert.data.length === 0)) {
+                if (el) { el.className = 'alert-monitor'; el.textContent = '🟢 מאזין — ללא אזעקות'; }
+                return;
+            }
+
+            const cities  = Array.isArray(alert.data) ? alert.data : [alert.data];
+            const alertId = alert.id || cities.join(',') + '_' + Date.now();
+
+            // אם כבר עיבדנו את האזעקה הזו — תעלם
+            if (alertId === lastDetectedAlertId) return;
+            lastDetectedAlertId = alertId;
+
+            // הצג ברצועת הסטטוס
+            if (el) {
+                el.className = 'alert-monitor active';
+                el.textContent = `🚨 אזעקה: ${cities.join(' | ')}`;
+            }
+
+            console.log('[Monitor] אזעקה זוהתה:', cities);
+
+            // כתוב ל-Firestore → יפעיל מיד את ה-Cloud Function שישלח FCM
+            await db.collection('_meta').doc('currentAlert').set({
+                alertId,
+                cities,
+                title: alert.title || 'צבע אדום',
+                detectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                source: 'admin_browser'
+            });
+
+            console.log('[Monitor] נכתב ל-Firestore, ממתין ל-Cloud Function...');
+
+        } catch (e) {
+            console.log('[Monitor] שגיאה:', e.message);
+            if (el) {
+                el.className = 'alert-monitor error';
+                // CORS error מציין בעיית גישה מהדפדפן — לא קריטי אם הפונקציה עובדת
+                el.textContent = e.message.includes('fetch') || e.message.includes('Failed')
+                    ? '⚠️ בעיית CORS — נסה לפתוח מ-Chrome בישראל'
+                    : '⚠️ שגיאת ניטור';
+            }
+        }
+    }
+
+    function startAlertMonitor() {
+        checkOrefAlert(); // הרץ מיד
+        monitorInterval = setInterval(checkOrefAlert, 15000); // כל 15 שניות
+    }
+
     function initAdmin() {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
@@ -482,6 +585,9 @@
         // תיקון גודל מפה — חשוב כשמאותחלת בתוך div מוסתר
         setTimeout(() => map.invalidateSize(), 100);
         setTimeout(() => map.invalidateSize(), 500);
+
+        // התחל ניטור אזעקות מהדפדפן
+        startAlertMonitor();
 
         // עדכון תוויות זמן כל דקה
         setInterval(() => { if (Object.keys(allDocs).length) buildPersonsList(); }, 60000);
