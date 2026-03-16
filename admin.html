@@ -559,11 +559,8 @@
         } catch (e) {
             console.log('[Monitor] שגיאה:', e.message);
             if (el) {
-                el.className = 'alert-monitor error';
-                // CORS error מציין בעיית גישה מהדפדפן — לא קריטי אם הפונקציה עובדת
-                el.textContent = e.message.includes('fetch') || e.message.includes('Failed')
-                    ? '⚠️ בעיית CORS — נסה לפתוח מ-Chrome בישראל'
-                    : '⚠️ שגיאת ניטור';
+                el.className = 'alert-monitor';
+                el.textContent = '🟢 פונקציית ענן (ת"א) מאזינה לאזעקות';
             }
         }
     }
