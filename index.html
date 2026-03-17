@@ -50,7 +50,38 @@
             padding: 28px 24px;
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            position: relative;
         }
+
+        /* ===== Language Selector ===== */
+        #lang-wrap {
+            position: fixed; top: 12px; right: 12px; z-index: 9999;
+        }
+        #lang-btn {
+            background: rgba(30,30,50,0.92); border: 1px solid #444;
+            border-radius: 22px; padding: 6px 13px;
+            color: #ccc; font-size: 0.75rem; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            backdrop-filter: blur(6px); transition: background 0.2s;
+        }
+        #lang-btn:hover { background: rgba(60,60,90,0.95); }
+        #lang-menu {
+            display: none; position: absolute; top: 36px; right: 0;
+            background: #14142a; border: 1px solid #333; border-radius: 14px;
+            min-width: 185px; max-height: 320px; overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+        }
+        #lang-menu.open { display: block; }
+        #lang-menu button {
+            display: flex; align-items: center; gap: 9px;
+            width: 100%; padding: 9px 15px; background: none; border: none;
+            color: #ccc; font-size: 0.83rem; text-align: left; cursor: pointer;
+            transition: background 0.15s;
+        }
+        #lang-menu button:hover { background: rgba(255,255,255,0.07); }
+        #lang-menu button.lang-active { color: #f39c12; font-weight: bold; }
+        #lang-menu button:first-child { border-radius: 14px 14px 0 0; }
+        #lang-menu button:last-child  { border-radius: 0 0 14px 14px; }
 
         .logo { font-size: 2.5rem; text-align: center; margin-bottom: 6px; }
         h1 { font-size: 1.7rem; text-align: center; margin-bottom: 3px; }
@@ -248,19 +279,25 @@
     </style>
 </head>
 <body>
+    <!-- Language Selector -->
+    <div id="lang-wrap">
+        <button id="lang-btn" onclick="toggleLangMenu()">🌐 <span id="lang-label">עברית</span></button>
+        <div id="lang-menu"></div>
+    </div>
+
     <div class="card">
         <div class="logo">🛡️</div>
         <h1>SafeZone</h1>
-        <p class="subtitle">מערכת הגנה לצוותי חירום</p>
+        <p class="subtitle" data-i18n="subtitle">מערכת הגנה לצוותי חירום</p>
 
         <div id="register-panel">
             <div class="form-group">
-                <label for="userName">שם מלא</label>
-                <input type="text" id="userName" placeholder="הכנס את שמך" autocomplete="name">
+                <label for="userName" data-i18n="label_name">שם מלא</label>
+                <input type="text" id="userName" placeholder="הכנס את שמך" data-i18n-ph="ph_name" autocomplete="name">
             </div>
             <div class="form-group">
-                <label for="userCity">עיר מגורים / עבודה</label>
-                <input type="text" id="userCity" list="cityList" placeholder="הקלד שם עיר..." autocomplete="off" dir="rtl">
+                <label for="userCity" data-i18n="label_city">עיר מגורים / עבודה</label>
+                <input type="text" id="userCity" list="cityList" placeholder="הקלד שם עיר..." data-i18n-ph="ph_city" autocomplete="off" dir="rtl">
                 <datalist id="cityList">
                     <option value="ירושלים">
                     <option value="תל אביב - יפו">
@@ -481,65 +518,65 @@
                     <option value="מסעדה">
                 </datalist>
             </div>
-            <button class="btn btn-activate" id="activateBtn" onclick="activateSystem()">
+            <button class="btn btn-activate" id="activateBtn" onclick="activateSystem()" data-i18n="btn_activate">
                 הפעל הגנה ודיווח מיקום
             </button>
         </div>
 
-        <div id="status">המערכת לא פעילה</div>
+        <div id="status" data-i18n="status_inactive">המערכת לא פעילה</div>
         <div id="loc-info"></div>
-        <button id="updateLocBtn" onclick="updateLocation()" style="display:none; margin-top:6px; background:none; border:none; color:var(--text-muted); font-size:0.78rem; cursor:pointer; text-decoration:underline; font-family:inherit;">
+        <button id="updateLocBtn" onclick="updateLocation()" style="display:none; margin-top:6px; background:none; border:none; color:var(--text-muted); font-size:0.78rem; cursor:pointer; text-decoration:underline; font-family:inherit;" data-i18n="btn_update_loc">
             📍 עדכן מיקום ידנית
         </button>
 
-        <div class="permission-hint" id="permHint">
+        <div class="permission-hint" id="permHint" data-i18n="perm_hint">
             ⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן.
         </div>
 
         <!-- פאנל דיווח סטטוס — מוצג אחרי הרשמה -->
         <div id="status-panel">
-            <p class="status-label" id="statusPanelLabel">דווח את מצבך כעת:</p>
+            <p class="status-label" id="statusPanelLabel" data-i18n="label_report">דווח את מצבך כעת:</p>
             <div class="status-buttons">
                 <button class="status-btn safe" onclick="reportStatus('safe')">
                     <span class="icon">✅</span>
-                    אני בטוח
+                    <span data-i18n="btn_safe">אני בטוח</span>
                 </button>
                 <button class="status-btn onway" onclick="reportStatus('onway')">
                     <span class="icon">🚗</span>
-                    אני בדרך
+                    <span data-i18n="btn_onway">אני בדרך</span>
                 </button>
                 <button class="status-btn help" onclick="reportStatus('help')">
                     <span class="icon">🆘</span>
-                    זקוק לעזרה
+                    <span data-i18n="btn_help">זקוק לעזרה</span>
                 </button>
             </div>
             <div class="current-status-bar" id="currentStatusBar"></div>
         </div>
 
-        <button class="btn btn-deactivate" id="deactivateBtn" onclick="deactivateSystem()" style="display:none; margin-top:14px;">
+        <button class="btn btn-deactivate" id="deactivateBtn" onclick="deactivateSystem()" style="display:none; margin-top:14px;" data-i18n="btn_deactivate">
             בטל רישום מהמערכת
         </button>
 
-        <footer>SafeZone v2.0 &bull; מערכת צוות חירום</footer>
+        <footer>SafeZone v2.0 &bull; <span data-i18n="footer">מערכת צוות חירום</span></footer>
     </div>
 
     <!-- באנר אזעקה (מופיע בראש המסך כשהאפליקציה פתוחה) -->
-    <div id="alert-banner">🚨 צבע אדום! דווח את מצבך</div>
+    <div id="alert-banner" data-i18n="banner">🚨 צבע אדום! דווח את מצבך</div>
 
     <!-- מודל בחירת מיקום ידנית -->
     <div id="map-modal">
         <div class="map-modal-box">
             <div class="map-modal-header">
-                <h3>📍 סמן את המיקום שלך במפה</h3>
-                <p>GPS לא זמין — לחץ על המפה לסימון מיקומך</p>
+                <h3 data-i18n="map_title">📍 סמן את המיקום שלך במפה</h3>
+                <p data-i18n="map_body">GPS לא זמין — לחץ על המפה לסימון מיקומך</p>
             </div>
-            <div class="pick-hint">לחץ על המפה כדי למקם את הסמן</div>
+            <div class="pick-hint" data-i18n="map_hint">לחץ על המפה כדי למקם את הסמן</div>
             <div id="location-pick-map"></div>
             <div class="map-modal-footer">
-                <button class="btn-pick-confirm" id="confirmPickBtn" onclick="confirmPickedLocation()" disabled>
+                <button class="btn-pick-confirm" id="confirmPickBtn" onclick="confirmPickedLocation()" disabled data-i18n="map_confirm">
                     📍 אשר מיקום
                 </button>
-                <button class="btn-pick-cancel" onclick="cancelMapPick()">ביטול</button>
+                <button class="btn-pick-cancel" onclick="cancelMapPick()" data-i18n="map_cancel">ביטול</button>
             </div>
         </div>
     </div>
@@ -557,6 +594,16 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const messaging = firebase.messaging();
+
+        // ---- Early language bootstrap (full system defined later) ----
+        var _currentLang = localStorage.getItem('safezone_lang') || 'he';
+        function T(key) {
+            try {
+                var lang = LANGS[_currentLang] || LANGS['he'];
+                return (lang && lang[key]) || (LANGS['he'] && LANGS['he'][key]) || key;
+            } catch(e) { return key; }
+        }
+        // ---------------------------------------------------------------
 
         let currentToken    = localStorage.getItem('safezone_token');
         let locationWatchId = null;
@@ -744,7 +791,7 @@
                     // הצג הודעה קצרה
                     const lbl = document.getElementById('statusPanelLabel');
                     if (lbl) {
-                        lbl.textContent = '✅ הדיווח טופל — תוכל לדווח שוב אם נדרש';
+                        lbl.textContent = T('reported_done');
                         lbl.className = 'status-label';
                     }
                 }
@@ -764,7 +811,7 @@
             document.querySelectorAll('.status-btn').forEach(b => b.disabled = true);
             const lbl = document.getElementById('statusPanelLabel');
             if (lbl) {
-                lbl.textContent = '✅ דיווח נשלח — ממתין לאזעקה הבאה';
+                lbl.textContent = T('sent_waiting');
                 lbl.className = 'status-label status-label-locked';
             }
             localStorage.setItem('safezone_locked', '1');
@@ -777,7 +824,7 @@
             });
             const lbl = document.getElementById('statusPanelLabel');
             if (lbl) {
-                lbl.textContent = fromAlert ? '🚨 אזעקה! דווח את מצבך:' : 'דווח את מצבך כעת:';
+                lbl.textContent = fromAlert ? T('alert_label') : T('label_report');
                 lbl.className = fromAlert
                     ? 'status-label status-label-alert'
                     : 'status-label';
@@ -798,7 +845,7 @@
         function showActiveState() {
             const name = localStorage.getItem('safezone_name') || '';
             const city = localStorage.getItem('safezone_city') || '';
-            setStatus('✅ הגנה פעילה', 'status-active');
+            setStatus(T('status_active'), 'status-active');
             document.getElementById('loc-info').textContent = `${name} — ${city}`;
             document.getElementById('register-panel').style.display = 'none';
             document.getElementById('status-panel').style.display = 'block';
@@ -818,12 +865,12 @@
 
         function getLocationWithFallback() {
             return new Promise((resolve, reject) => {
-                setStatus('מאתר מיקום GPS...', 'status-loading');
+                setStatus(T('status_locating'), 'status-loading');
                 navigator.geolocation.getCurrentPosition(
                     (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
                     () => {
                         // GPS נכשל — פתח מפה לבחירה ידנית
-                        setStatus('GPS לא זמין — בחר מיקום ידנית', 'status-loading');
+                        setStatus(T('status_gps_fail'), 'status-loading');
                         openMapPicker(resolve, reject);
                     },
                     { timeout: 10000, enableHighAccuracy: true }
@@ -858,7 +905,7 @@
                     }
                     document.getElementById('confirmPickBtn').disabled = false;
                     document.getElementById('confirmPickBtn').textContent =
-                        `📍 אשר: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+                        `📍 ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
                 });
             } else {
                 // רענן מפה (גודל יכול להיות שגוי לאחר display:none)
@@ -882,7 +929,7 @@
         async function updateLocation() {
             if (!currentToken) return;
             const btn = document.getElementById('updateLocBtn');
-            btn.textContent = '📍 בוחר מיקום...';
+            btn.textContent = '📍 ...';
 
             try {
                 // פתח מפה לבחירה ידנית ישירות — ללא ניסיון GPS
@@ -891,11 +938,11 @@
                     lat: loc.lat,
                     lng: loc.lng
                 });
-                btn.textContent = '✅ מיקום עודכן!';
-                setTimeout(() => { btn.textContent = '📍 עדכן מיקום ידנית'; }, 2500);
+                btn.textContent = '✅';
+                setTimeout(() => { btn.textContent = T('btn_update_loc'); }, 2500);
             } catch(e) {
                 if (e.message !== 'ביטול') alert('שגיאה בעדכון מיקום: ' + e.message);
-                btn.textContent = '📍 עדכן מיקום ידנית';
+                btn.textContent = T('btn_update_loc');
             }
         }
         // ===========================
@@ -916,7 +963,7 @@
                 const loc = await getLocationWithFallback();
 
                 // שלב 2: הרשאות התראות
-                setStatus('מבקש הרשאות התראות...', 'status-loading');
+                setStatus(T('status_req_notif'), 'status-loading');
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') {
                     document.getElementById('permHint').classList.add('show');
@@ -924,7 +971,7 @@
                 }
 
                 // שלב 3: רישום FCM
-                setStatus('רושם למערכת...', 'status-loading');
+                setStatus(T('status_registering'), 'status-loading');
                 const swReg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
                 const token = await messaging.getToken({
                     serviceWorkerRegistration: swReg,
@@ -954,14 +1001,14 @@
 
             } catch (err) {
                 if (err.message === 'ביטול') {
-                    setStatus('הרישום בוטל', '');
+                    setStatus(T('status_cancelled'), '');
                 } else {
-                    setStatus('❌ שגיאה', 'status-error');
+                    setStatus('❌ ' + T('status_error_short'), 'status-error');
                     alert("שגיאה: " + (err.message || err));
                 }
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = 'הפעל הגנה ודיווח מיקום';
+                btn.textContent = T('btn_activate');
             }
         }
 
@@ -985,22 +1032,576 @@
         }
 
         function highlightStatusBtn(status) {
-            const labels = { safe: '✅ אני בטוח', onway: '🚗 אני בדרך', help: '🆘 זקוק לעזרה' };
             document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
             const btn = document.querySelector(`.status-btn.${status}`);
             if (btn) btn.classList.add('active');
 
+            const statusLabel = { safe: T('status_safe'), onway: T('status_onway'), help: T('status_help') };
+            const statusIcon  = { safe: '✅', onway: '🚗', help: '🆘' };
             const bar = document.getElementById('currentStatusBar');
-            bar.textContent = `הסטטוס הנוכחי: ${labels[status]}`;
+            bar.textContent = `${T('current_status')}: ${statusIcon[status]} ${statusLabel[status]}`;
             bar.className = `current-status-bar ${status}`;
             bar.style.display = 'block';
         }
 
+        // ===================================================
+        // ========== MULTI-LANGUAGE SYSTEM ================
+        // ===================================================
+        const LANGS = {
+            he: {
+                dir:'rtl', flag:'🇮🇱', name:'עברית',
+                subtitle:'מערכת הגנה לצוותי חירום',
+                label_name:'שם מלא', label_city:'עיר מגורים / עבודה',
+                ph_name:'הכנס את שמך', ph_city:'הקלד שם עיר...',
+                btn_activate:'הפעל הגנה ודיווח מיקום',
+                label_report:'דווח את מצבך כעת:',
+                btn_safe:'אני בטוח', btn_onway:'אני בדרך', btn_help:'זקוק לעזרה',
+                btn_deactivate:'בטל רישום מהמערכת',
+                footer:'מערכת צוות חירום',
+                banner:'🚨 צבע אדום! דווח את מצבך',
+                status_inactive:'המערכת לא פעילה',
+                perm_hint:'⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן.',
+                btn_update_loc:'📍 עדכן מיקום ידנית',
+                map_title:'📍 סמן את המיקום שלך במפה',
+                map_body:'GPS לא זמין — לחץ על המפה לסימון מיקומך',
+                map_hint:'לחץ על המפה כדי למקם את הסמן',
+                map_confirm:'📍 אשר מיקום', map_cancel:'ביטול',
+                alert_label:'🚨 אזעקה! דווח את מצבך:',
+                sent_waiting:'✅ דיווח נשלח — ממתין לאזעקה הבאה',
+                reported_done:'✅ הדיווח טופל — תוכל לדווח שוב אם נדרש',
+                current_status:'הסטטוס הנוכחי',
+                status_safe:'בטוח', status_onway:'בדרך', status_help:'זקוק לעזרה',
+                status_active:'✅ הגנה פעילה',
+                status_locating:'מאתר מיקום GPS...',
+                status_gps_fail:'GPS לא זמין — בחר מיקום ידנית',
+                status_req_notif:'מבקש הרשאות התראות...',
+                status_registering:'רושם למערכת...',
+                status_cancelled:'הרישום בוטל',
+                status_error_short:'שגיאה',
+                confirm_deactivate:'לבטל את הרישום מ-SafeZone?',
+                deactivating:'מבטל...'
+            },
+            en: {
+                dir:'ltr', flag:'🇬🇧', name:'English',
+                subtitle:'Emergency Team Protection System',
+                label_name:'Full Name', label_city:'City of Residence / Work',
+                ph_name:'Enter your name', ph_city:'Type city name...',
+                btn_activate:'Activate Protection & GPS Tracking',
+                label_report:'Report your current status:',
+                btn_safe:"I'm Safe", btn_onway:'On My Way', btn_help:'Need Help',
+                btn_deactivate:'Deactivate System',
+                footer:'Emergency Team System',
+                banner:'🚨 Red Alert! Report your status',
+                status_inactive:'System Inactive',
+                perm_hint:'⚠️ Please allow location and notification permissions in browser settings.',
+                btn_update_loc:'📍 Update Location Manually',
+                map_title:'📍 Mark Your Location on Map',
+                map_body:'GPS unavailable — click the map to set your location',
+                map_hint:'Click the map to place the marker',
+                map_confirm:'📍 Confirm Location', map_cancel:'Cancel',
+                alert_label:'🚨 Alert! Report your status:',
+                sent_waiting:'✅ Report sent — waiting for next alert',
+                reported_done:'✅ Report handled — you can report again if needed',
+                current_status:'Current status',
+                status_safe:'Safe', status_onway:'On the way', status_help:'Needs help',
+                status_active:'✅ Protection Active',
+                status_locating:'Locating GPS...',
+                status_gps_fail:'GPS unavailable — select location manually',
+                status_req_notif:'Requesting notification permission...',
+                status_registering:'Registering...',
+                status_cancelled:'Registration cancelled',
+                status_error_short:'Error',
+                confirm_deactivate:'Deactivate from SafeZone?',
+                deactivating:'Deactivating...'
+            },
+            ar: {
+                dir:'rtl', flag:'🌍', name:'عربية',
+                subtitle:'نظام حماية فرق الطوارئ',
+                label_name:'الاسم الكامل', label_city:'مدينة السكن / العمل',
+                ph_name:'أدخل اسمك', ph_city:'اكتب اسم المدينة...',
+                btn_activate:'تفعيل الحماية ومشاركة الموقع',
+                label_report:'أبلغ عن وضعك الحالي:',
+                btn_safe:'أنا بأمان', btn_onway:'في الطريق', btn_help:'أحتاج مساعدة',
+                btn_deactivate:'إلغاء التسجيل',
+                footer:'نظام فريق الطوارئ',
+                banner:'🚨 تنبيه أحمر! أبلغ عن وضعك',
+                status_inactive:'النظام غير نشط',
+                perm_hint:'⚠️ يرجى السماح بأذونات الموقع والإشعارات في إعدادات المتصفح.',
+                btn_update_loc:'📍 تحديث الموقع يدوياً',
+                map_title:'📍 حدد موقعك على الخريطة',
+                map_body:'GPS غير متاح — انقر على الخريطة لتحديد موقعك',
+                map_hint:'انقر على الخريطة لوضع العلامة',
+                map_confirm:'📍 تأكيد الموقع', map_cancel:'إلغاء',
+                alert_label:'🚨 تنبيه! أبلغ عن وضعك:',
+                sent_waiting:'✅ تم الإرسال — في انتظار التنبيه القادم',
+                reported_done:'✅ تمت المعالجة — يمكنك الإبلاغ مجدداً إذا لزم',
+                current_status:'الوضع الحالي',
+                status_safe:'بأمان', status_onway:'في الطريق', status_help:'يحتاج مساعدة',
+                status_active:'✅ الحماية نشطة',
+                status_locating:'تحديد موقع GPS...',
+                status_gps_fail:'GPS غير متاح — اختر الموقع يدوياً',
+                status_req_notif:'طلب إذن الإشعارات...',
+                status_registering:'جاري التسجيل...',
+                status_cancelled:'تم إلغاء التسجيل',
+                confirm_deactivate:'إلغاء التسجيل من SafeZone؟',
+                deactivating:'جاري الإلغاء...'
+            },
+            ru: {
+                dir:'ltr', flag:'🇷🇺', name:'Русский',
+                subtitle:'Система защиты аварийных бригад',
+                label_name:'Полное имя', label_city:'Город проживания / работы',
+                ph_name:'Введите ваше имя', ph_city:'Введите название города...',
+                btn_activate:'Активировать защиту и GPS',
+                label_report:'Сообщите ваш текущий статус:',
+                btn_safe:'Я в безопасности', btn_onway:'Еду туда', btn_help:'Нужна помощь',
+                btn_deactivate:'Отключить систему',
+                footer:'Система аварийной бригады',
+                banner:'🚨 Красная тревога! Сообщите статус',
+                status_inactive:'Система неактивна',
+                perm_hint:'⚠️ Разрешите доступ к местоположению и уведомлениям в настройках браузера.',
+                btn_update_loc:'📍 Обновить местоположение вручную',
+                map_title:'📍 Отметьте ваше местоположение',
+                map_body:'GPS недоступен — нажмите на карту для отметки',
+                map_hint:'Нажмите на карту, чтобы разместить маркер',
+                map_confirm:'📍 Подтвердить', map_cancel:'Отмена',
+                alert_label:'🚨 Тревога! Сообщите статус:',
+                sent_waiting:'✅ Отчёт отправлен — ожидание следующей тревоги',
+                reported_done:'✅ Обработано — можете снова сообщить при необходимости',
+                current_status:'Текущий статус',
+                status_safe:'В безопасности', status_onway:'Еду', status_help:'Нужна помощь',
+                status_active:'✅ Защита активна',
+                status_locating:'Определение GPS...',
+                status_gps_fail:'GPS недоступен — выберите местоположение вручную',
+                status_req_notif:'Запрос разрешения уведомлений...',
+                status_registering:'Регистрация...',
+                status_cancelled:'Регистрация отменена',
+                confirm_deactivate:'Отключить SafeZone?',
+                deactivating:'Отключение...'
+            },
+            am: {
+                dir:'ltr', flag:'🇪🇹', name:'አማርኛ',
+                subtitle:'የአደጋ ቡድን ጥበቃ ስርዓት',
+                label_name:'ሙሉ ስም', label_city:'የመኖሪያ / የስራ ከተማ',
+                ph_name:'ስምዎን ያስገቡ', ph_city:'የከተማ ስም ያስገቡ...',
+                btn_activate:'ጥበቃን እና GPS ን ያንቁ',
+                label_report:'የአሁኑ ሁኔታዎን ሪፖርት ያድርጉ:',
+                btn_safe:'ደህና ነኝ', btn_onway:'በመምጣት ላይ', btn_help:'እርዳታ ያስፈልገኛል',
+                btn_deactivate:'ስርዓቱን ያቋርጡ',
+                footer:'የአደጋ ቡድን ስርዓት',
+                banner:'🚨 ቀይ ማንቂያ! ሁኔታዎን ሪፖርት ያድርጉ',
+                status_inactive:'ስርዓቱ ንቁ አይደለም',
+                perm_hint:'⚠️ እባክዎ የቦታ እና ማሳወቂያ ፈቃዶችን ይፍቀዱ።',
+                btn_update_loc:'📍 ቦታ በእጅ ያዘምኑ',
+                map_title:'📍 በካርታው ላይ ቦታዎን ምልክት ያድርጉ',
+                map_body:'GPS አይገኝም — ቦታዎን ለመምረጥ ካርታ ላይ ጠቅ ያድርጉ',
+                map_hint:'ምልክቱን ለማስቀመጥ ካርታ ላይ ጠቅ ያድርጉ',
+                map_confirm:'📍 ቦታ ያረጋግጡ', map_cancel:'ይቅር',
+                alert_label:'🚨 ማንቂያ! ሁኔታዎን ሪፖርት ያድርጉ:',
+                sent_waiting:'✅ ሪፖርት ተልኳል — ቀጣይ ማንቂያ በመጠበቅ',
+                reported_done:'✅ ተፈትሷል — አስፈላጊ ከሆነ እንደገና ሪፖርት ማድረግ ይችላሉ',
+                current_status:'የአሁኑ ሁኔታ',
+                status_safe:'ደህና', status_onway:'በመምጣት', status_help:'እርዳታ ያስፈልጋቸዋል',
+                status_active:'✅ ጥበቃ ንቁ ነው',
+                status_locating:'GPS ቦታ በማፈላለግ...',
+                status_gps_fail:'GPS አይገኝም — ቦታ በእጅ ይምረጡ',
+                status_req_notif:'የማሳወቂያ ፈቃድ በመጠየቅ...',
+                status_registering:'በመመዝገብ ላይ...',
+                status_cancelled:'ምዝገባ ተሰርዟል',
+                confirm_deactivate:'ከ-SafeZone መውጣት?',
+                deactivating:'በማቋረጥ ላይ...'
+            },
+            fr: {
+                dir:'ltr', flag:'🇫🇷', name:'Français',
+                subtitle:"Système de protection des équipes d'urgence",
+                label_name:'Nom complet', label_city:'Ville de résidence / travail',
+                ph_name:'Entrez votre nom', ph_city:'Tapez le nom de la ville...',
+                btn_activate:'Activer la protection et le GPS',
+                label_report:'Signalez votre statut actuel:',
+                btn_safe:'Je suis en sécurité', btn_onway:'En route', btn_help:"Besoin d'aide",
+                btn_deactivate:'Désactiver le système',
+                footer:"Système d'équipe d'urgence",
+                banner:'🚨 Alerte rouge! Signalez votre statut',
+                status_inactive:'Système inactif',
+                perm_hint:'⚠️ Veuillez autoriser la localisation et les notifications dans les paramètres du navigateur.',
+                btn_update_loc:'📍 Mettre à jour la position',
+                map_title:'📍 Marquez votre emplacement sur la carte',
+                map_body:'GPS indisponible — cliquez sur la carte pour marquer votre position',
+                map_hint:'Cliquez sur la carte pour placer le marqueur',
+                map_confirm:'📍 Confirmer', map_cancel:'Annuler',
+                alert_label:'🚨 Alerte! Signalez votre statut:',
+                sent_waiting:"✅ Rapport envoyé — en attente de la prochaine alerte",
+                reported_done:'✅ Traité — vous pouvez signaler à nouveau si nécessaire',
+                current_status:'Statut actuel',
+                status_safe:'En sécurité', status_onway:'En route', status_help:"Besoin d'aide",
+                status_active:'✅ Protection active',
+                status_locating:'Localisation GPS...',
+                status_gps_fail:'GPS indisponible — sélectionnez la position manuellement',
+                status_req_notif:'Demande de permission de notification...',
+                status_registering:'Enregistrement...',
+                status_cancelled:'Enregistrement annulé',
+                confirm_deactivate:'Désactiver SafeZone?',
+                deactivating:'Désactivation...'
+            },
+            es: {
+                dir:'ltr', flag:'🇪🇸', name:'Español',
+                subtitle:'Sistema de protección de equipos de emergencia',
+                label_name:'Nombre completo', label_city:'Ciudad de residencia / trabajo',
+                ph_name:'Ingrese su nombre', ph_city:'Escriba el nombre de la ciudad...',
+                btn_activate:'Activar protección y GPS',
+                label_report:'Reporta tu estado actual:',
+                btn_safe:'Estoy seguro', btn_onway:'En camino', btn_help:'Necesito ayuda',
+                btn_deactivate:'Desactivar sistema',
+                footer:'Sistema de equipo de emergencia',
+                banner:'🚨 ¡Alerta roja! Reporta tu estado',
+                status_inactive:'Sistema inactivo',
+                perm_hint:'⚠️ Por favor, permite el acceso a ubicación y notificaciones en la configuración del navegador.',
+                btn_update_loc:'📍 Actualizar ubicación manualmente',
+                map_title:'📍 Marca tu ubicación en el mapa',
+                map_body:'GPS no disponible — haz clic en el mapa para marcar tu posición',
+                map_hint:'Haz clic en el mapa para colocar el marcador',
+                map_confirm:'📍 Confirmar ubicación', map_cancel:'Cancelar',
+                alert_label:'🚨 ¡Alerta! Reporta tu estado:',
+                sent_waiting:'✅ Reporte enviado — esperando la próxima alerta',
+                reported_done:'✅ Procesado — puedes reportar de nuevo si es necesario',
+                current_status:'Estado actual',
+                status_safe:'Seguro', status_onway:'En camino', status_help:'Necesita ayuda',
+                status_active:'✅ Protección activa',
+                status_locating:'Localizando GPS...',
+                status_gps_fail:'GPS no disponible — seleccione ubicación manualmente',
+                status_req_notif:'Solicitando permiso de notificaciones...',
+                status_registering:'Registrando...',
+                status_cancelled:'Registro cancelado',
+                confirm_deactivate:'¿Desactivar SafeZone?',
+                deactivating:'Desactivando...'
+            },
+            de: {
+                dir:'ltr', flag:'🇩🇪', name:'Deutsch',
+                subtitle:'Schutzsystem für Notfallteams',
+                label_name:'Vollständiger Name', label_city:'Wohnort / Arbeitsort',
+                ph_name:'Geben Sie Ihren Namen ein', ph_city:'Stadtname eingeben...',
+                btn_activate:'Schutz und GPS aktivieren',
+                label_report:'Melden Sie Ihren aktuellen Status:',
+                btn_safe:'Ich bin sicher', btn_onway:'Ich bin unterwegs', btn_help:'Ich brauche Hilfe',
+                btn_deactivate:'System deaktivieren',
+                footer:'Notfall-Team-System',
+                banner:'🚨 Roter Alarm! Status melden',
+                status_inactive:'System inaktiv',
+                perm_hint:'⚠️ Bitte erlauben Sie Standort- und Benachrichtigungsberechtigungen.',
+                btn_update_loc:'📍 Standort manuell aktualisieren',
+                map_title:'📍 Markieren Sie Ihren Standort',
+                map_body:'GPS nicht verfügbar — klicken Sie auf die Karte',
+                map_hint:'Klicken Sie auf die Karte, um den Marker zu platzieren',
+                map_confirm:'📍 Bestätigen', map_cancel:'Abbrechen',
+                alert_label:'🚨 Alarm! Status melden:',
+                sent_waiting:'✅ Meldung gesendet — warte auf nächsten Alarm',
+                reported_done:'✅ Bearbeitet — Sie können erneut melden',
+                current_status:'Aktueller Status',
+                status_safe:'Sicher', status_onway:'Unterwegs', status_help:'Braucht Hilfe',
+                status_active:'✅ Schutz aktiv',
+                status_locating:'GPS wird gesucht...',
+                status_gps_fail:'GPS nicht verfügbar — wählen Sie Standort manuell',
+                status_req_notif:'Benachrichtigungsberechtigung anfragen...',
+                status_registering:'Registrierung...',
+                status_cancelled:'Registrierung abgebrochen',
+                confirm_deactivate:'SafeZone deaktivieren?',
+                deactivating:'Deaktivierung...'
+            },
+            ro: {
+                dir:'ltr', flag:'🇷🇴', name:'Română',
+                subtitle:'Sistem de protecție pentru echipe de urgență',
+                label_name:'Nume complet', label_city:'Oraș de reședință / muncă',
+                ph_name:'Introduceți numele dvs.', ph_city:'Tastați numele orașului...',
+                btn_activate:'Activați protecția și GPS',
+                label_report:'Raportați starea dvs. actuală:',
+                btn_safe:'Sunt în siguranță', btn_onway:'Sunt pe drum', btn_help:'Am nevoie de ajutor',
+                btn_deactivate:'Dezactivați sistemul',
+                footer:'Sistem pentru echipe de urgență',
+                banner:'🚨 Alertă roșie! Raportați starea dvs.',
+                status_inactive:'Sistem inactiv',
+                perm_hint:'⚠️ Vă rugăm să permiteți accesul la locație și notificări în setările browserului.',
+                btn_update_loc:'📍 Actualizați locația manual',
+                map_title:'📍 Marcați locația dvs. pe hartă',
+                map_body:'GPS indisponibil — faceți clic pe hartă pentru a marca locația',
+                map_hint:'Faceți clic pe hartă pentru a plasa marcatorul',
+                map_confirm:'📍 Confirmați locația', map_cancel:'Anulare',
+                alert_label:'🚨 Alertă! Raportați starea:',
+                sent_waiting:'✅ Raport trimis — așteptând următoarea alertă',
+                reported_done:'✅ Procesat — puteți raporta din nou dacă este necesar',
+                current_status:'Starea curentă',
+                status_safe:'În siguranță', status_onway:'Pe drum', status_help:'Are nevoie de ajutor',
+                status_active:'✅ Protecție activă',
+                status_locating:'Localizare GPS...',
+                status_gps_fail:'GPS indisponibil — selectați locația manual',
+                status_req_notif:'Solicitare permisiune notificări...',
+                status_registering:'Înregistrare...',
+                status_cancelled:'Înregistrare anulată',
+                confirm_deactivate:'Dezactivați SafeZone?',
+                deactivating:'Dezactivare...'
+            },
+            pt: {
+                dir:'ltr', flag:'🇵🇹', name:'Português',
+                subtitle:'Sistema de proteção para equipes de emergência',
+                label_name:'Nome completo', label_city:'Cidade de residência / trabalho',
+                ph_name:'Digite seu nome', ph_city:'Digite o nome da cidade...',
+                btn_activate:'Ativar proteção e GPS',
+                label_report:'Relate seu status atual:',
+                btn_safe:'Estou seguro', btn_onway:'A caminho', btn_help:'Preciso de ajuda',
+                btn_deactivate:'Desativar sistema',
+                footer:'Sistema de equipe de emergência',
+                banner:'🚨 Alerta vermelho! Relate seu status',
+                status_inactive:'Sistema inativo',
+                perm_hint:'⚠️ Por favor, permita acesso à localização e notificações nas configurações do navegador.',
+                btn_update_loc:'📍 Atualizar localização manualmente',
+                map_title:'📍 Marque sua localização no mapa',
+                map_body:'GPS indisponível — clique no mapa para marcar sua posição',
+                map_hint:'Clique no mapa para colocar o marcador',
+                map_confirm:'📍 Confirmar localização', map_cancel:'Cancelar',
+                alert_label:'🚨 Alerta! Relate seu status:',
+                sent_waiting:'✅ Relatório enviado — aguardando o próximo alerta',
+                reported_done:'✅ Processado — você pode relatar novamente se necessário',
+                current_status:'Status atual',
+                status_safe:'Seguro', status_onway:'A caminho', status_help:'Precisa de ajuda',
+                status_active:'✅ Proteção ativa',
+                status_locating:'Localizando GPS...',
+                status_gps_fail:'GPS indisponível — selecione a localização manualmente',
+                status_req_notif:'Solicitando permissão de notificações...',
+                status_registering:'Registrando...',
+                status_cancelled:'Registro cancelado',
+                confirm_deactivate:'Desativar o SafeZone?',
+                deactivating:'Desativando...'
+            },
+            it: {
+                dir:'ltr', flag:'🇮🇹', name:'Italiano',
+                subtitle:'Sistema di protezione per team di emergenza',
+                label_name:'Nome completo', label_city:'Città di residenza / lavoro',
+                ph_name:'Inserisci il tuo nome', ph_city:'Digita il nome della città...',
+                btn_activate:'Attiva protezione e GPS',
+                label_report:'Segnala il tuo stato attuale:',
+                btn_safe:'Sono al sicuro', btn_onway:'Sto arrivando', btn_help:'Ho bisogno di aiuto',
+                btn_deactivate:'Disattiva sistema',
+                footer:'Sistema per team di emergenza',
+                banner:'🚨 Allerta rossa! Segnala il tuo stato',
+                status_inactive:'Sistema inattivo',
+                perm_hint:"⚠️ Si prega di consentire l'accesso alla posizione e alle notifiche nelle impostazioni del browser.",
+                btn_update_loc:'📍 Aggiorna posizione manualmente',
+                map_title:'📍 Segna la tua posizione sulla mappa',
+                map_body:'GPS non disponibile — clicca sulla mappa per segnare la posizione',
+                map_hint:'Clicca sulla mappa per posizionare il marker',
+                map_confirm:'📍 Conferma posizione', map_cancel:'Annulla',
+                alert_label:'🚨 Allerta! Segnala il tuo stato:',
+                sent_waiting:'✅ Segnalazione inviata — in attesa del prossimo allarme',
+                reported_done:'✅ Gestito — puoi segnalare di nuovo se necessario',
+                current_status:'Stato attuale',
+                status_safe:'Al sicuro', status_onway:'In arrivo', status_help:'Ha bisogno di aiuto',
+                status_active:'✅ Protezione attiva',
+                status_locating:'Localizzazione GPS...',
+                status_gps_fail:'GPS non disponibile — seleziona la posizione manualmente',
+                status_req_notif:'Richiesta autorizzazione notifiche...',
+                status_registering:'Registrazione...',
+                status_cancelled:'Registrazione annullata',
+                confirm_deactivate:'Disattivare SafeZone?',
+                deactivating:'Disattivazione...'
+            },
+            pl: {
+                dir:'ltr', flag:'🇵🇱', name:'Polski',
+                subtitle:'System ochrony dla zespołów ratowniczych',
+                label_name:'Imię i nazwisko', label_city:'Miasto zamieszkania / pracy',
+                ph_name:'Wpisz swoje imię', ph_city:'Wpisz nazwę miasta...',
+                btn_activate:'Aktywuj ochronę i GPS',
+                label_report:'Zgłoś swój aktualny status:',
+                btn_safe:'Jestem bezpieczny', btn_onway:'Jadę', btn_help:'Potrzebuję pomocy',
+                btn_deactivate:'Dezaktywuj system',
+                footer:'System zespołu ratowniczego',
+                banner:'🚨 Czerwony alert! Zgłoś swój status',
+                status_inactive:'System nieaktywny',
+                perm_hint:'⚠️ Proszę zezwolić na dostęp do lokalizacji i powiadomień w ustawieniach przeglądarki.',
+                btn_update_loc:'📍 Zaktualizuj lokalizację ręcznie',
+                map_title:'📍 Zaznacz swoją lokalizację na mapie',
+                map_body:'GPS niedostępny — kliknij mapę, aby oznaczyć pozycję',
+                map_hint:'Kliknij mapę, aby umieścić marker',
+                map_confirm:'📍 Potwierdź lokalizację', map_cancel:'Anuluj',
+                alert_label:'🚨 Alert! Zgłoś swój status:',
+                sent_waiting:'✅ Zgłoszenie wysłane — oczekiwanie na następny alert',
+                reported_done:'✅ Obsłużono — możesz ponownie zgłosić jeśli potrzeba',
+                current_status:'Aktualny status',
+                status_safe:'Bezpieczny', status_onway:'Jadę', status_help:'Potrzebuje pomocy',
+                status_active:'✅ Ochrona aktywna',
+                status_locating:'Lokalizacja GPS...',
+                status_gps_fail:'GPS niedostępny — wybierz lokalizację ręcznie',
+                status_req_notif:'Żądanie uprawnień do powiadomień...',
+                status_registering:'Rejestracja...',
+                status_cancelled:'Rejestracja anulowana',
+                confirm_deactivate:'Dezaktywować SafeZone?',
+                deactivating:'Dezaktywacja...'
+            },
+            ti: {
+                dir:'ltr', flag:'🇪🇷', name:'ትግርኛ',
+                subtitle:'ስርዓት ምክልኻል ጋንታ ህጹጽ እዋን',
+                label_name:'ሙሉ ስም', label_city:'ከተማ ምቕማጥ / ስራሕ',
+                ph_name:'ስምካ ኣእቱ', ph_city:'ስም ከተማ ኣእቱ...',
+                btn_activate:'ምክልኻልን GPS ን ኣብቅዕ',
+                label_report:'ሕጂ ዘሎካ ኩነታት ሪፖርት ግበር:',
+                btn_safe:'ብሰላም ኣሎኹ', btn_onway:'ኣብ መንገዲ', btn_help:'ሓገዝ የድልየኒ',
+                btn_deactivate:'ካብ ስርዓቱ ውጻእ',
+                footer:'ስርዓት ጋንታ ህጹጽ እዋን',
+                banner:'🚨 ቀይሕ ምልክት! ኩነታትካ ሪፖርት ግበር',
+                status_inactive:'ስርዓቱ ዕጹው',
+                perm_hint:'⚠️ ፍቓድ ቦታን ምልክታን ኣብ ምቕራጽ ኣፍቅድ።',
+                btn_update_loc:'📍 ቦታ ብኢድ ኣዘምን',
+                map_title:'📍 ቦታኻ ኣብ ካርታ ምልክት ግበር',
+                map_body:'GPS ኣይርከብን — ኣብ ካርታ ጠዊቕካ ቦታኻ ምልክት ግበር',
+                map_hint:'ምልክት ንምቕማጥ ኣብ ካርታ ጠዊቕ',
+                map_confirm:'📍 ቦታ ኣረጋግጽ', map_cancel:'ሰርዝ',
+                alert_label:'🚨 ምልክት! ኩነታትካ ሪፖርት ግበር:',
+                sent_waiting:'✅ ሪፖርት ተሰዲዱ — ንዝቕጽል ምልክት ኣብ ምጽባይ',
+                reported_done:'✅ ተፈቲሑ — ኣድላዪ እንተኾይኑ ደጊምካ ሪፖርት ግበር',
+                current_status:'ሕጂ ዘሎ ኩነታት',
+                status_safe:'ብሰላም', status_onway:'ኣብ መንገዲ', status_help:'ሓገዝ የድልዮ',
+                status_active:'✅ ምክልኻል ንቑሕ',
+                status_locating:'GPS ቦታ ኣብ ምድላይ...',
+                status_gps_fail:'GPS ኣይርከብን — ቦታ ብኢድ ምረጽ',
+                status_req_notif:'ፍቓድ ምልክታ ኣብ ምሕታት...',
+                status_registering:'ኣብ ምምዝጋብ...',
+                status_cancelled:'ምምዝጋብ ተሰሪዙ',
+                confirm_deactivate:'ካብ SafeZone ምውጻእ?',
+                deactivating:'ኣብ ምውጻእ...'
+            },
+            uk: {
+                dir:'ltr', flag:'🇺🇦', name:'Українська',
+                subtitle:'Система захисту аварійних бригад',
+                label_name:"Повне ім'я", label_city:'Місто проживання / роботи',
+                ph_name:"Введіть ваше ім'я", ph_city:'Введіть назву міста...',
+                btn_activate:'Активувати захист і GPS',
+                label_report:'Повідомте ваш поточний статус:',
+                btn_safe:'Я в безпеці', btn_onway:'Їду туди', btn_help:'Потрібна допомога',
+                btn_deactivate:'Відключити систему',
+                footer:'Система аварійної бригади',
+                banner:'🚨 Червона тривога! Повідомте статус',
+                status_inactive:'Система неактивна',
+                perm_hint:'⚠️ Будь ласка, дозвольте доступ до місцезнаходження та сповіщень у налаштуваннях браузера.',
+                btn_update_loc:'📍 Оновити місцезнаходження вручну',
+                map_title:'📍 Відмітьте ваше місцезнаходження на карті',
+                map_body:'GPS недоступний — натисніть на карту для відмітки',
+                map_hint:'Натисніть на карту, щоб розмістити маркер',
+                map_confirm:'📍 Підтвердити', map_cancel:'Скасування',
+                alert_label:'🚨 Тривога! Повідомте статус:',
+                sent_waiting:'✅ Звіт відправлено — очікування наступної тривоги',
+                reported_done:'✅ Оброблено — можете знову повідомити при необхідності',
+                current_status:'Поточний статус',
+                status_safe:'В безпеці', status_onway:'Їду', status_help:'Потрібна допомога',
+                status_active:'✅ Захист активний',
+                status_locating:'Визначення GPS...',
+                status_gps_fail:'GPS недоступний — оберіть місцезнаходження вручну',
+                status_req_notif:'Запит дозволу сповіщень...',
+                status_registering:'Реєстрація...',
+                status_cancelled:'Реєстрацію скасовано',
+                confirm_deactivate:'Відключити SafeZone?',
+                deactivating:'Відключення...'
+            }
+        };
+
+        // ---- Translation helpers (var _currentLang and T() bootstrapped at top of script) ----
+
+        function getLang() {
+            return localStorage.getItem('safezone_lang') || 'he';
+        }
+
+        function setLang(code) {
+            if (!LANGS[code]) return;
+            _currentLang = code;
+            localStorage.setItem('safezone_lang', code);
+            applyLang();
+            closeLangMenu();
+        }
+
+        function applyLang() {
+            const lang = LANGS[_currentLang] || LANGS['he'];
+            // Document direction
+            document.documentElement.dir = lang.dir;
+            document.documentElement.lang = _currentLang;
+            // Update label button
+            const lbl = document.getElementById('lang-label');
+            if (lbl) lbl.textContent = lang.name;
+            // Align lang-wrap and dropdown for RTL vs LTR
+            const wrap = document.getElementById('lang-wrap');
+            if (wrap) {
+                wrap.style.right = lang.dir === 'rtl' ? 'auto' : '12px';
+                wrap.style.left  = lang.dir === 'rtl' ? '12px'  : 'auto';
+            }
+            const menu = document.getElementById('lang-menu');
+            if (menu) {
+                menu.style.right = lang.dir === 'rtl' ? 'auto' : '0';
+                menu.style.left  = lang.dir === 'rtl' ? '0'    : 'auto';
+            }
+            // Static data-i18n elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (lang[key] !== undefined) el.textContent = lang[key];
+            });
+            // Placeholder attrs
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+                const key = el.getAttribute('data-i18n-ph');
+                if (lang[key] !== undefined) el.placeholder = lang[key];
+            });
+            // Highlight active lang in menu
+            document.querySelectorAll('#lang-menu button').forEach(btn => {
+                btn.classList.toggle('lang-active', btn.dataset.lang === _currentLang);
+            });
+            // Update live dynamic labels (if status panel is visible)
+            const isLocked = localStorage.getItem('safezone_locked') === '1';
+            const panelLbl = document.getElementById('statusPanelLabel');
+            if (panelLbl && panelLbl.style.display !== 'none') {
+                // Don't override a custom locked/alert message — refresh it instead
+                if (isLocked) panelLbl.textContent = T('sent_waiting');
+            }
+            // Update status bar if visible
+            const bar = document.getElementById('currentStatusBar');
+            if (bar && bar.style.display === 'block') {
+                const savedStatus = localStorage.getItem('safezone_status');
+                if (savedStatus) highlightStatusBtn(savedStatus);
+            }
+        }
+
+        function buildLangMenu() {
+            const menu = document.getElementById('lang-menu');
+            if (!menu) return;
+            menu.innerHTML = Object.keys(LANGS).map(code => {
+                const l = LANGS[code];
+                return `<button data-lang="${code}" onclick="setLang('${code}')" title="${l.name}">
+                    <span>${l.flag}</span><span>${l.name}</span>
+                </button>`;
+            }).join('');
+        }
+
+        function toggleLangMenu() {
+            const menu = document.getElementById('lang-menu');
+            if (menu) menu.classList.toggle('open');
+        }
+
+        function closeLangMenu() {
+            const menu = document.getElementById('lang-menu');
+            if (menu) menu.classList.remove('open');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrap = document.getElementById('lang-wrap');
+            if (wrap && !wrap.contains(e.target)) closeLangMenu();
+        });
+
+        // Initialise language on page load
+        (function initLang() {
+            _currentLang = getLang();
+            buildLangMenu();
+            applyLang();
+        })();
+        // =====================================================
+
         async function deactivateSystem() {
-            if (!confirm("לבטל את הרישום מ-SafeZone?")) return;
+            if (!confirm(T('confirm_deactivate'))) return;
             const btn = document.getElementById('deactivateBtn');
             btn.disabled = true;
-            btn.textContent = 'מבטל...';
+            btn.textContent = T('deactivating');
 
             try {
                 if (currentToken) await db.collection('tokens').doc(currentToken).delete();
@@ -1014,7 +1615,7 @@
                 for (const r of regs) await r.unregister();
             } catch(e) {}
 
-            setStatus('המערכת לא פעילה', '');
+            setStatus(T('status_inactive'), '');
             document.getElementById('loc-info').textContent = '';
             document.getElementById('register-panel').style.display = 'block';
             document.getElementById('status-panel').style.display = 'none';
@@ -1024,7 +1625,7 @@
             stopUserAlertPolling();
             if (docUnsubscribe) { docUnsubscribe(); docUnsubscribe = null; }
             btn.disabled = false;
-            btn.textContent = 'בטל רישום מהמערכת';
+            btn.textContent = T('btn_deactivate');
         }
     </script>
 </body>
