@@ -699,13 +699,16 @@
                 for (const city of cities) {
                     if (uLat && uLng) {
                         const coords = await geocodeCityUser(city);
-                        if (coords && haversineKmUser(uLat, uLng, coords.lat, coords.lng) <= 10) {
+                        if (!coords) {
+                            // geocoding נכשל — לא נפספס, מניחים שקרוב
+                            nearby = true; break;
+                        }
+                        if (haversineKmUser(uLat, uLng, coords.lat, coords.lng) <= 20) {
                             nearby = true; break;
                         }
                     } else {
-                        // fallback — השם שנרשם
-                        const storedCity = localStorage.getItem('safezone_city') || '';
-                        if (storedCity === city) { nearby = true; break; }
+                        // אין GPS — שלח תמיד (לא ידוע איפה המשתמש)
+                        nearby = true; break;
                     }
                 }
 
