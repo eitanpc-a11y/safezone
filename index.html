@@ -975,9 +975,16 @@
 
                 // שלב 3: רישום FCM
                 setStatus(T('status_registering'), 'status-loading');
-                const swReg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+                // רשום את ה-Service Worker
+                await navigator.serviceWorker.register('firebase-messaging-sw.js');
+                // המתן עד שה-SW יהיה Active (לא רק Installed) — זה קריטי לפני getToken
+                // navigator.serviceWorker.ready מחזיר registration עם SW פעיל בלבד
+                const activeReg = await Promise.race([
+                    navigator.serviceWorker.ready,
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('Service Worker לא הופעל תוך 15 שניות — נסה לרענן')), 15000))
+                ]);
                 const token = await messaging.getToken({
-                    serviceWorkerRegistration: swReg,
+                    serviceWorkerRegistration: activeReg,
                     vapidKey: "BIXCZU-c8gIaA5JScoc7-wDLWKZErE9YM1-NKt0ot0UZq6c6iGKWQgxBHaFzquGlyjL6pMwpV-vH0NOq6XmxZGo"
                 });
                 if (!token) throw new Error("לא ניתן לקבל token — נסה שוב");

@@ -72,6 +72,11 @@ self.addEventListener('notificationclick', function(event) {
     );
 });
 
+// הפעל את ה-SW מיד בלי להמתין לסגירת טאבים ישנים
+self.addEventListener('install', function(event) {
+    self.skipWaiting();
+});
+
 self.addEventListener('activate', function(event) {
     event.waitUntil(clients.claim());
 });
