@@ -6,7 +6,9 @@
       ".firebaserc",
       ".gitignore",
       "functions/**",
-      "node_modules/**"
+      "node_modules/**",
+      "firestore.rules",
+      "firestore.indexes.json"
     ],
     "rewrites": [],
     "headers": [
@@ -42,6 +44,10 @@
         ]
       }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": {
     "source": "functions",

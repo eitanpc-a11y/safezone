@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // אפליקציית SafeZone: tokens של משתמשים
+    // כל מכשיר יכול לקרוא ולכתוב את ה-token שלו
+    match /tokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    // _meta: מצב האזעקה הנוכחית
+    // נדרש לקריאה מהאפליקציה ולכתיבה מ-Cloud Functions
+    match /_meta/{docId} {
+      allow read, write: if true;
+    }
+
+    // חסום כל שאר הגישות
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

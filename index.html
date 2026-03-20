@@ -1034,15 +1034,32 @@
                 console.log('[FCM] Token:', token.slice(0,20) + '...');
 
                 // שלב 4: שמירה ב-Firestore
-                await db.collection('tokens').doc(token).set({
-                    name, city,
-                    lat: loc.lat,
-                    lng: loc.lng,
-                    token,
-                    status: null,
-                    statusTime: null,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                try {
+                    await db.collection('tokens').doc(token).set({
+                        name, city,
+                        lat: loc.lat,
+                        lng: loc.lng,
+                        token,
+                        status: null,
+                        statusTime: null,
+                        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (fsErr) {
+                    console.error('[Firestore] שגיאה בשמירה:', fsErr);
+                    // שגיאה ב-Firestore = הסיבה העיקרית לכך שאזעקות לא מגיעות!
+                    throw new Error(
+                        '⚠️ שגיאה בשמירה במסד הנתונים (' + (fsErr.code || fsErr.message) + ').\n' +
+                        'הפוש עצמו עובד אבל אזעקות אמיתיות לא יגיעו.\n' +
+                        'פנה לאחראי המערכת לתיקון.'
+                    );
+                }
+
+                // אימות: ודא שה-token אכן נשמר
+                const verifyDoc = await db.collection('tokens').doc(token).get();
+                if (!verifyDoc.exists) {
+                    throw new Error('⚠️ הרישום לא נשמר במסד הנתונים. אזעקות לא יגיעו. פנה לאחראי.');
+                }
+                console.log('[Firestore] ✅ Token נשמר ואומת בהצלחה');
 
                 currentToken = token;
                 localStorage.setItem('safezone_token', token);
