@@ -557,6 +557,12 @@
             בטל רישום מהמערכת
         </button>
 
+        <!-- כפתור בדיקת Push — מופיע רק אחרי רישום -->
+        <button id="testPushBtn" onclick="testMyPush()" style="display:none; margin-top:8px; width:100%; padding:10px; background:#2c3e50; color:#ecf0f1; border:1px solid #4a6278; border-radius:10px; cursor:pointer; font-size:0.85rem;">
+            🔔 בדוק שה-Push עובד על הטלפון שלי
+        </button>
+        <div id="testPushResult" style="display:none; margin-top:6px; padding:8px; border-radius:8px; font-size:0.82rem; text-align:center;"></div>
+
         <footer>SafeZone v2.0 &bull; <span data-i18n="footer">מערכת צוות חירום</span></footer>
     </div>
 
@@ -854,6 +860,7 @@
             document.getElementById('status-panel').style.display = 'block';
             document.getElementById('deactivateBtn').style.display = 'block';
             document.getElementById('updateLocBtn').style.display = 'inline-block';
+            document.getElementById('testPushBtn').style.display = 'block';
 
             // שחזר מצב נעילה
             const savedStatus = localStorage.getItem('safezone_status');
@@ -975,19 +982,33 @@
 
                 // שלב 3: רישום FCM
                 setStatus(T('status_registering'), 'status-loading');
-                // רשום את ה-Service Worker
-                await navigator.serviceWorker.register('firebase-messaging-sw.js');
-                // המתן עד שה-SW יהיה Active (לא רק Installed) — זה קריטי לפני getToken
-                // navigator.serviceWorker.ready מחזיר registration עם SW פעיל בלבד
-                const activeReg = await Promise.race([
-                    navigator.serviceWorker.ready,
-                    new Promise((_, rej) => setTimeout(() => rej(new Error('Service Worker לא הופעל תוך 15 שניות — נסה לרענן')), 15000))
-                ]);
+
+                // רשום firebase-messaging-sw.js ספציפית
+                const swReg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+
+                // המתן עד שה-SW הספציפי הזה (לא אחר!) יהיה Active
+                // navigator.serviceWorker.ready עלול להחזיר SW ישן — לכן בודקים swReg.active
+                if (!swReg.active) {
+                    await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('Service Worker לא הופעל תוך 15 שניות — נסה לסגור ולפתוח שוב')), 15000);
+                        const interval = setInterval(() => {
+                            if (swReg.active) {
+                                clearTimeout(timer);
+                                clearInterval(interval);
+                                resolve();
+                            }
+                        }, 300);
+                    });
+                }
+
+                console.log('[SW] Service Worker פעיל:', swReg.active?.scriptURL);
+
                 const token = await messaging.getToken({
-                    serviceWorkerRegistration: activeReg,
+                    serviceWorkerRegistration: swReg,
                     vapidKey: "BIXCZU-c8gIaA5JScoc7-wDLWKZErE9YM1-NKt0ot0UZq6c6iGKWQgxBHaFzquGlyjL6pMwpV-vH0NOq6XmxZGo"
                 });
                 if (!token) throw new Error("לא ניתן לקבל token — נסה שוב");
+                console.log('[FCM] Token:', token.slice(0,20) + '...');
 
                 // שלב 4: שמירה ב-Firestore
                 await db.collection('tokens').doc(token).set({
@@ -1631,11 +1652,59 @@
             document.getElementById('status-panel').style.display = 'none';
             document.getElementById('deactivateBtn').style.display = 'none';
             document.getElementById('updateLocBtn').style.display = 'none';
+            document.getElementById('testPushBtn').style.display = 'none';
+            document.getElementById('testPushResult').style.display = 'none';
             stopLocationTracking();
             stopUserAlertPolling();
             if (docUnsubscribe) { docUnsubscribe(); docUnsubscribe = null; }
             btn.disabled = false;
             btn.textContent = T('btn_deactivate');
+        }
+
+        // ===== בדיקת Push על ההתקן הנוכחי =====
+        async function testMyPush() {
+            const token = currentToken || localStorage.getItem('safezone_token');
+            const resultEl = document.getElementById('testPushResult');
+            const btn = document.getElementById('testPushBtn');
+
+            if (!token) {
+                resultEl.style.display = 'block';
+                resultEl.style.background = '#e74c3c22';
+                resultEl.style.color = '#e74c3c';
+                resultEl.textContent = '❌ לא רשום — אנא הצטרף קודם';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ שולח בדיקה...';
+            resultEl.style.display = 'block';
+            resultEl.style.background = '#2c3e5022';
+            resultEl.style.color = '#95a5a6';
+            resultEl.textContent = 'שולח הודעת בדיקה...';
+
+            try {
+                const url = `https://me-west1-safezone-cd4b5.cloudfunctions.net/testMyDevice?token=${encodeURIComponent(token)}`;
+                const res = await fetch(url, { timeout: 15000 });
+                const text = await res.text();
+
+                if (text.startsWith('OK')) {
+                    resultEl.style.background = '#27ae6022';
+                    resultEl.style.color = '#27ae60';
+                    resultEl.textContent = '✅ הבדיקה נשלחה! תוך כמה שניות תגיע התראה לטלפון. אם לא הגיעה — הרשאות ההתראות חסומות.';
+                } else {
+                    resultEl.style.background = '#e74c3c22';
+                    resultEl.style.color = '#e74c3c';
+                    resultEl.textContent = '❌ שגיאה: ' + text;
+                    console.error('[TestPush]', text);
+                }
+            } catch(e) {
+                resultEl.style.background = '#e74c3c22';
+                resultEl.style.color = '#e74c3c';
+                resultEl.textContent = '❌ לא ניתן להגיע לשרת: ' + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔔 בדוק שה-Push עובד על הטלפון שלי';
+            }
         }
     </script>
 </body>

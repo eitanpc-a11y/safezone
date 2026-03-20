@@ -273,6 +273,7 @@
 
             <div class="panel-footer">
                 <button class="btn-test" id="testBtn" onclick="sendTestAlert()">🚨 ניסוי צופר</button>
+                <button class="btn-test" onclick="runDiagnose()" style="background:#1a2a3a;border-color:#2a4a6a;">🔎 אבחון מערכת</button>
             </div>
         </div>
     </div>
@@ -479,6 +480,38 @@
             batch.update(db.collection('tokens').doc(id), { status: null, statusTime: null });
         });
         await batch.commit();
+    }
+
+    async function runDiagnose() {
+        const el = document.getElementById('alert-monitor');
+        if (el) { el.className = 'alert-monitor'; el.textContent = '🔄 מריץ אבחון מלא...'; }
+        try {
+            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/diagnose?key=${ADMIN_SECRET_KEY}`);
+            const data = await res.json();
+            console.log('[Diagnose]', data);
+
+            let msg = `🔎 אבחון (${new Date().toLocaleTimeString('he-IL')})\n\n`;
+            msg += `📱 Tokens רשומים: ${data.tokenCount ?? 'שגיאה'}\n`;
+            if (data.tokens?.length > 0) {
+                data.tokens.forEach(t => {
+                    msg += `  • ${t.name} (${t.city}) GPS:${t.hasGPS ? '✅' : '❌'}\n`;
+                });
+            }
+            msg += `\n📡 Proxy: ${data.proxy?.ok ? '✅ תקין' : '❌ ' + data.proxy?.error}\n`;
+            msg += `🌐 oref ישיר: ${data.orefDirect?.ok ? '✅' : '❌'} (${data.orefDirect?.note || data.orefDirect?.status})\n`;
+            msg += `\n📬 אחרון שנשלח: ${data.lastAlert ? JSON.stringify(data.lastAlert.cities) + ' ב-' + data.lastAlert.alertId : 'אף פעם'}`;
+
+            alert(msg);
+
+            if (el) {
+                const color = (data.tokenCount > 0 && data.proxy?.ok) ? 'alert-monitor' : 'alert-monitor error';
+                el.className = color;
+                el.textContent = `🔎 אבחון: ${data.tokenCount} tokens | proxy:${data.proxy?.ok ? '✅' : '❌'} | oref:${data.orefDirect?.ok ? '✅' : '❌'}`;
+            }
+        } catch(e) {
+            alert('❌ אבחון נכשל: ' + e.message);
+            if (el) { el.className = 'alert-monitor error'; el.textContent = '❌ אבחון נכשל: ' + e.message; }
+        }
     }
 
     async function sendTestAlert() {
