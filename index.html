@@ -533,6 +533,16 @@
             ⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן.
         </div>
 
+        <!-- הנחיית iOS — מופיעה רק אם iPhone/iPad ב-Safari רגיל (לא PWA) -->
+        <div id="iosHint" style="display:none; margin-top:12px; padding:14px; background:#1a0a00; border:1px solid #7a3200; border-radius:12px; color:#f39c12; font-size:0.85rem; line-height:1.5; text-align:center;">
+            <div style="font-size:1.1rem; margin-bottom:6px;">📱 iPhone / iPad</div>
+            <strong>כדי לקבל התראות ב-iPhone, יש להתקין כ-אפליקציה:</strong><br><br>
+            1. לחץ על <strong>□↑</strong> (כפתור השיתוף) בתחתית Safari<br>
+            2. בחר <strong>"הוסף למסך הבית"</strong><br>
+            3. פתח את SafeZone <strong>ממסך הבית</strong><br>
+            4. אז הירשם מחדש
+        </div>
+
         <!-- פאנל דיווח סטטוס — מוצג אחרי הרשמה -->
         <div id="status-panel">
             <p class="status-label" id="statusPanelLabel" data-i18n="label_report">דווח את מצבך כעת:</p>
@@ -750,6 +760,19 @@
         function stopUserAlertPolling() {
             if (alertPollTimer) { clearInterval(alertPollTimer); alertPollTimer = null; }
         }
+
+        // ===== זיהוי iOS — הנחיה להתקנה כ-PWA =====
+        (function checkiOS() {
+            const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isStandalone = window.navigator.standalone === true ||
+                                  window.matchMedia('(display-mode: standalone)').matches;
+            if (isIOS && !isStandalone) {
+                // iOS Safari רגיל — הצג הנחיה להתקנה
+                const hint = document.getElementById('iosHint');
+                if (hint) hint.style.display = 'block';
+            }
+        })();
 
         // בדיקת URL params — מהנוטיפיקציה
         const urlParams = new URLSearchParams(window.location.search);
@@ -1034,8 +1057,23 @@
                 if (err.message === 'ביטול') {
                     setStatus(T('status_cancelled'), '');
                 } else {
-                    setStatus('❌ ' + T('status_error_short'), 'status-error');
-                    alert("שגיאה: " + (err.message || err));
+                    // זיהוי שגיאת iOS ספציפית
+                    const isTokenFail = (err.code === 'messaging/token-subscribe-failed') ||
+                                        (err.message && err.message.includes('token-subscribe-failed')) ||
+                                        (err.message && err.message.includes('authentication credentials'));
+                    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                    const isStandalone = window.navigator.standalone === true ||
+                                         window.matchMedia('(display-mode: standalone)').matches;
+
+                    if (isTokenFail && isIOS && !isStandalone) {
+                        setStatus('❌ iPhone: דרוש התקנה כ-אפליקציה', 'status-error');
+                        document.getElementById('iosHint').style.display = 'block';
+                        document.getElementById('iosHint').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        setStatus('❌ ' + T('status_error_short'), 'status-error');
+                        alert("שגיאה: " + (err.message || err));
+                    }
                 }
             } finally {
                 btn.disabled = false;
