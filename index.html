@@ -790,6 +790,54 @@
             } else if (alertParam === '1') {
                 unlockButtons(true);
             }
+
+            // בדיקת Firestore — ודא שה-token אכן רשום (חשוב אחרי חוקי Firestore התחדשו)
+            setTimeout(async function verifyFirestoreRegistration() {
+                try {
+                    const doc = await db.collection('tokens').doc(currentToken).get();
+                    if (!doc.exists) {
+                        // Token בlocalStorage אבל לא ב-Firestore — הרשמה אבדה!
+                        console.warn('[Startup] Token לא נמצא ב-Firestore — נרשם מחדש...');
+                        const name = localStorage.getItem('safezone_name') || '';
+                        const city = localStorage.getItem('safezone_city') || '';
+                        if (name && city) {
+                            try {
+                                await db.collection('tokens').doc(currentToken).set({
+                                    name, city,
+                                    lat: null, lng: null,
+                                    token: currentToken,
+                                    status: null, statusTime: null,
+                                    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                                    autoReregistered: true
+                                });
+                                console.log('[Startup] ✅ נרשם מחדש ב-Firestore אוטומטית');
+                                // הצג הודעה לא חודרנית
+                                const statusEl = document.getElementById('connStatus');
+                                if (statusEl) {
+                                    const prev = statusEl.textContent;
+                                    statusEl.textContent = '🔄 ' + T('status_reconnected') + ' ✅';
+                                    setTimeout(() => { statusEl.textContent = prev; }, 4000);
+                                }
+                            } catch (reRegErr) {
+                                console.error('[Startup] כישלון ברישום מחדש:', reRegErr.message);
+                                setStatus('⚠️ ' + T('warn_rereg_failed'), 'status-error');
+                            }
+                        } else {
+                            // אין שם/עיר — צריך רישום מלא מחדש
+                            console.warn('[Startup] חסרים פרטים — נדרש רישום מחדש');
+                            setStatus('⚠️ ' + T('warn_reregister'), 'status-error');
+                        }
+                    } else {
+                        console.log('[Startup] ✅ Token מאומת ב-Firestore');
+                    }
+                } catch (e) {
+                    // אם Firestore חסום — נציג אזהרה
+                    if (e.code === 'permission-denied') {
+                        console.error('[Startup] Firestore חסום! אזעקות לא יגיעו.');
+                        setStatus('🚨 ' + T('warn_firestore_blocked'), 'status-error');
+                    }
+                }
+            }, 3000); // מחכים 3 שניות עד שהאפליקציה מתייצבת
         }
 
         // ===== הקשבה להודעות מה-Service Worker =====
@@ -1164,6 +1212,10 @@
                 status_registering:'רושם למערכת...',
                 status_cancelled:'הרישום בוטל',
                 status_error_short:'שגיאה',
+                status_reconnected:'הרישום חודש אוטומטית',
+                warn_rereg_failed:'כישלון ברישום מחדש — לחץ "הפעל" שוב',
+                warn_reregister:'נדרש רישום מחדש — לחץ "הפעל"',
+                warn_firestore_blocked:'שגיאת מסד נתונים — אזעקות לא יגיעו! פנה לאחראי',
                 confirm_deactivate:'לבטל את הרישום מ-SafeZone?',
                 deactivating:'מבטל...'
             },
@@ -1197,6 +1249,10 @@
                 status_registering:'Registering...',
                 status_cancelled:'Registration cancelled',
                 status_error_short:'Error',
+                status_reconnected:'Registration renewed automatically',
+                warn_rereg_failed:'Re-registration failed — press Activate again',
+                warn_reregister:'Re-registration required — press Activate',
+                warn_firestore_blocked:'Database error — alerts will not arrive! Contact admin',
                 confirm_deactivate:'Deactivate from SafeZone?',
                 deactivating:'Deactivating...'
             },
