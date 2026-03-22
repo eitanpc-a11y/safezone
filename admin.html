@@ -92,6 +92,28 @@
         .stat-box.safe    .stat-num { color: #5edb8a; }
         .stat-box.pending .stat-num { color: #aaaaff; }
 
+        /* alarm banner */
+        #helpAlarmBanner {
+            display: none; position: sticky; top: 0; z-index: 999;
+            background: linear-gradient(135deg, #8b0000, #c0392b);
+            border: 2px solid #ff4444; border-radius: 10px;
+            padding: 12px 14px; margin-bottom: 10px;
+            animation: alarm-pulse 0.8s ease-in-out infinite;
+            text-align: center;
+        }
+        @keyframes alarm-pulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.6); }
+            50%      { box-shadow: 0 0 0 10px rgba(255,68,68,0); }
+        }
+        #helpAlarmBanner .alarm-title { font-size: 1rem; font-weight: bold; color: white; margin-bottom: 4px; }
+        #helpAlarmBanner .alarm-names { font-size: 0.78rem; color: rgba(255,255,255,0.85); margin-bottom: 8px; }
+        .btn-stop-alarm {
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.4);
+            color: white; border-radius: 20px; padding: 5px 18px;
+            font-size: 0.8rem; cursor: pointer; font-family: inherit;
+        }
+        .btn-stop-alarm:hover { background: rgba(255,255,255,0.25); }
+
         /* pending list */
         .pending-section { margin-top: 8px; }
         .pending-header {
@@ -302,6 +324,12 @@
                 </button>
             </div>
 
+            <div id="helpAlarmBanner">
+                <div class="alarm-title">🆘 זקוק לעזרה!</div>
+                <div class="alarm-names" id="helpAlarmNames"></div>
+                <button class="btn-stop-alarm" onclick="stopAlarm()">🔕 הפסק צפצוף</button>
+            </div>
+
             <div class="persons-list" id="personsList">
                 <div class="empty-state">אין דיווחים כרגע<br>ממתין לנתונים...</div>
             </div>
@@ -341,6 +369,92 @@
     };
 
     let db, map;
+    // ===== צפצוף חירום — "זקוק לעזרה" =====
+    let audioCtx = null;
+    let alarmInterval = null;
+    let alarmActive = false;
+    const activeHelpIds = new Set(); // מי נמצא כרגע ב-help
+
+    function getAudioCtx() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return audioCtx;
+    }
+
+    function playBeep(freq, duration, startTime) {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.35, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration - 0.01);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+    }
+
+    function playAlarmPattern() {
+        const ctx = getAudioCtx();
+        const t = ctx.currentTime;
+        // 3 צפצופים עולים: 800→1000→1200 Hz
+        playBeep(800,  0.15, t);
+        playBeep(1000, 0.15, t + 0.2);
+        playBeep(1200, 0.22, t + 0.4);
+    }
+
+    function startAlarm(names) {
+        alarmActive = true;
+        const banner = document.getElementById('helpAlarmBanner');
+        const namesEl = document.getElementById('helpAlarmNames');
+        if (banner) banner.style.display = 'block';
+        if (namesEl) namesEl.textContent = names.join(' | ');
+        playAlarmPattern();
+        if (!alarmInterval) {
+            alarmInterval = setInterval(() => {
+                if (alarmActive) playAlarmPattern();
+            }, 3000);
+        }
+    }
+
+    function stopAlarm() {
+        alarmActive = false;
+        if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
+        const banner = document.getElementById('helpAlarmBanner');
+        if (banner) banner.style.display = 'none';
+    }
+
+    function updateHelpAlarm() {
+        // מצא את כל ה-help פעילים שלא טופלו
+        const helpers = Object.entries(allDocs)
+            .filter(([id, d]) => d.status === 'help' && !doneDocs.has(id))
+            .map(([, d]) => d.name || 'אנונימי');
+
+        const currentIds = new Set(
+            Object.entries(allDocs)
+                .filter(([id, d]) => d.status === 'help' && !doneDocs.has(id))
+                .map(([id]) => id)
+        );
+
+        // בדוק אם יש ID חדש שלא היה קודם
+        let hasNew = false;
+        currentIds.forEach(id => { if (!activeHelpIds.has(id)) hasNew = true; });
+        // עדכן את הסט
+        activeHelpIds.clear();
+        currentIds.forEach(id => activeHelpIds.add(id));
+
+        if (currentIds.size > 0) {
+            const namesEl = document.getElementById('helpAlarmNames');
+            if (namesEl) namesEl.textContent = helpers.join(' | ');
+            const banner = document.getElementById('helpAlarmBanner');
+            if (banner) banner.style.display = 'block';
+            if (hasNew) startAlarm(helpers); // הפעל צפצוף רק לחדש
+        } else {
+            stopAlarm();
+        }
+    }
+    // =========================================
+
     let allDocs = {}; // docId -> data
     let markers = {}; // docId -> leaflet marker
     let safeTimers = {};
@@ -569,6 +683,7 @@
             doneDocs.add(id);
             if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
             buildPersonsList();
+            updateHelpAlarm();
         } catch(e) { alert("שגיאה: " + e.message); }
     }
 
@@ -933,6 +1048,7 @@
             });
 
             buildPersonsList();
+            updateHelpAlarm();
 
             // מרכז מפה אוטומטית בטעינה ראשונה
             if (firstLoad && Object.keys(markers).length > 0) {
