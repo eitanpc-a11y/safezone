@@ -561,6 +561,7 @@
                 </button>
             </div>
             <div class="current-status-bar" id="currentStatusBar"></div>
+            <button id="manualUnlockBtn" onclick="manualUnlock()" style="display:none;margin-top:12px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.45);border-radius:20px;padding:6px 16px;font-size:0.72rem;cursor:pointer;width:100%;" data-i18n="btn_manual_unlock">🔔 יש אזעקה חדשה — לחץ לדיווח מחדש</button>
         </div>
 
         <button class="btn btn-deactivate" id="deactivateBtn" onclick="deactivateSystem()" style="display:none; margin-top:14px;" data-i18n="btn_deactivate">
@@ -939,6 +940,10 @@
                 lbl.className = 'status-label status-label-locked';
             }
             localStorage.setItem('safezone_locked', '1');
+            localStorage.setItem('safezone_lock_time', Date.now().toString());
+            // הצג כפתור ביטול נעילה ידני
+            const unlockBtn = document.getElementById('manualUnlockBtn');
+            if (unlockBtn) unlockBtn.style.display = 'block';
         }
 
         function unlockButtons(fromAlert) {
@@ -955,9 +960,33 @@
             }
             const bar = document.getElementById('currentStatusBar');
             if (bar) bar.style.display = 'none';
+            const unlockBtn = document.getElementById('manualUnlockBtn');
+            if (unlockBtn) unlockBtn.style.display = 'none';
             localStorage.removeItem('safezone_locked');
+            localStorage.removeItem('safezone_lock_time');
             localStorage.removeItem('safezone_status');
         }
+
+        // ===== ביטול נעילה ידני על ידי המשתמש =====
+        function manualUnlock() {
+            unlockButtons(false);
+            const lbl = document.getElementById('statusPanelLabel');
+            if (lbl) lbl.textContent = T('label_report');
+        }
+
+        // ===== ביטול נעילה אוטומטי לאחר 2 שעות =====
+        function checkAutoUnlock() {
+            if (localStorage.getItem('safezone_locked') !== '1') return;
+            const lockTime = parseInt(localStorage.getItem('safezone_lock_time') || '0');
+            const twoHours = 2 * 60 * 60 * 1000;
+            if (Date.now() - lockTime > twoHours) {
+                console.log('[AutoUnlock] עברו 2 שעות — פתיחת כפתורים אוטומטית');
+                unlockButtons(false);
+            }
+        }
+        // בדוק בהפעלה ובכל 30 דקות
+        checkAutoUnlock();
+        setInterval(checkAutoUnlock, 30 * 60 * 1000);
         // ============================================
 
         function setStatus(text, cls) {
@@ -1240,6 +1269,7 @@
                 status_inactive:'המערכת לא פעילה',
                 perm_hint:'⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן.',
                 btn_update_loc:'📍 עדכן מיקום ידנית',
+                btn_manual_unlock:'🔔 יש אזעקה חדשה — לחץ לדיווח מחדש',
                 map_title:'📍 סמן את המיקום שלך במפה',
                 map_body:'GPS לא זמין — לחץ על המפה לסימון מיקומך',
                 map_hint:'לחץ על המפה כדי למקם את הסמן',
@@ -1277,6 +1307,7 @@
                 status_inactive:'System Inactive',
                 perm_hint:'⚠️ Please allow location and notification permissions in browser settings.',
                 btn_update_loc:'📍 Update Location Manually',
+                btn_manual_unlock:'🔔 New alert — tap to report again',
                 map_title:'📍 Mark Your Location on Map',
                 map_body:'GPS unavailable — click the map to set your location',
                 map_hint:'Click the map to place the marker',
@@ -1314,6 +1345,7 @@
                 status_inactive:'النظام غير نشط',
                 perm_hint:'⚠️ يرجى السماح بأذونات الموقع والإشعارات في إعدادات المتصفح.',
                 btn_update_loc:'📍 تحديث الموقع يدوياً',
+                btn_manual_unlock:'🔔 تنبيه جديد — انقر للإبلاغ مرة أخرى',
                 map_title:'📍 حدد موقعك على الخريطة',
                 map_body:'GPS غير متاح — انقر على الخريطة لتحديد موقعك',
                 map_hint:'انقر على الخريطة لوضع العلامة',
@@ -1346,6 +1378,7 @@
                 status_inactive:'Система неактивна',
                 perm_hint:'⚠️ Разрешите доступ к местоположению и уведомлениям в настройках браузера.',
                 btn_update_loc:'📍 Обновить местоположение вручную',
+                btn_manual_unlock:'🔔 Новая тревога — нажмите для отчёта',
                 map_title:'📍 Отметьте ваше местоположение',
                 map_body:'GPS недоступен — нажмите на карту для отметки',
                 map_hint:'Нажмите на карту, чтобы разместить маркер',
@@ -1378,6 +1411,7 @@
                 status_inactive:'ስርዓቱ ንቁ አይደለም',
                 perm_hint:'⚠️ እባክዎ የቦታ እና ማሳወቂያ ፈቃዶችን ይፍቀዱ።',
                 btn_update_loc:'📍 ቦታ በእጅ ያዘምኑ',
+                btn_manual_unlock:'🔔 አዲስ ማንቂያ — ሪፖርት ለማድረግ ይጫኑ',
                 map_title:'📍 በካርታው ላይ ቦታዎን ምልክት ያድርጉ',
                 map_body:'GPS አይገኝም — ቦታዎን ለመምረጥ ካርታ ላይ ጠቅ ያድርጉ',
                 map_hint:'ምልክቱን ለማስቀመጥ ካርታ ላይ ጠቅ ያድርጉ',
@@ -1410,6 +1444,7 @@
                 status_inactive:'Système inactif',
                 perm_hint:'⚠️ Veuillez autoriser la localisation et les notifications dans les paramètres du navigateur.',
                 btn_update_loc:'📍 Mettre à jour la position',
+                btn_manual_unlock:'🔔 Nouvelle alerte — appuyez pour signaler',
                 map_title:'📍 Marquez votre emplacement sur la carte',
                 map_body:'GPS indisponible — cliquez sur la carte pour marquer votre position',
                 map_hint:'Cliquez sur la carte pour placer le marqueur',
@@ -1442,6 +1477,7 @@
                 status_inactive:'Sistema inactivo',
                 perm_hint:'⚠️ Por favor, permite el acceso a ubicación y notificaciones en la configuración del navegador.',
                 btn_update_loc:'📍 Actualizar ubicación manualmente',
+                btn_manual_unlock:'🔔 Nueva alerta — toque para reportar',
                 map_title:'📍 Marca tu ubicación en el mapa',
                 map_body:'GPS no disponible — haz clic en el mapa para marcar tu posición',
                 map_hint:'Haz clic en el mapa para colocar el marcador',

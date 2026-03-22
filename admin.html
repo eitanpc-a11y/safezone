@@ -74,21 +74,41 @@
         .logout-link:hover { color: #888; }
 
         /* Stat counters */
-        .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
         .stat-box {
-            border-radius: 10px; padding: 10px 6px; text-align: center;
+            border-radius: 10px; padding: 10px 4px; text-align: center;
             border: 1px solid rgba(255,255,255,0.08);
         }
-        .stat-box.help  { background: #3d0000; border-color: #7a0000; }
-        .stat-box.onway { background: #3d2a00; border-color: #7a5500; }
-        .stat-box.safe  { background: #003d1a; border-color: #006633; }
+        .stat-box.help    { background: #3d0000; border-color: #7a0000; }
+        .stat-box.onway   { background: #3d2a00; border-color: #7a5500; }
+        .stat-box.safe    { background: #003d1a; border-color: #006633; }
+        .stat-box.pending { background: #1a1a2e; border-color: #3a3a6e; }
 
         .stat-box .stat-icon { font-size: 0.85rem; }
-        .stat-box .stat-num  { font-size: 1.6rem; font-weight: bold; color: white; line-height: 1.1; }
-        .stat-box .stat-lbl  { font-size: 0.68rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
-        .stat-box.help  .stat-num { color: #ff6b6b; }
-        .stat-box.onway .stat-num { color: #ffc04d; }
-        .stat-box.safe  .stat-num { color: #5edb8a; }
+        .stat-box .stat-num  { font-size: 1.5rem; font-weight: bold; color: white; line-height: 1.1; }
+        .stat-box .stat-lbl  { font-size: 0.63rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+        .stat-box.help    .stat-num { color: #ff6b6b; }
+        .stat-box.onway   .stat-num { color: #ffc04d; }
+        .stat-box.safe    .stat-num { color: #5edb8a; }
+        .stat-box.pending .stat-num { color: #aaaaff; }
+
+        /* pending list */
+        .pending-section { margin-top: 8px; }
+        .pending-header {
+            font-size: 0.75rem; color: #8888cc; text-align: center;
+            padding: 5px 0; cursor: pointer; user-select: none;
+        }
+        .pending-header:hover { color: #aaaaff; }
+        .pending-names {
+            display: none; background: #0d0d1a; border: 1px solid #2a2a5a;
+            border-radius: 8px; padding: 8px; margin-top: 4px;
+        }
+        .pending-names.open { display: block; }
+        .pending-name-item {
+            font-size: 0.8rem; color: #8888cc; padding: 4px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .pending-name-item:last-child { border-bottom: none; }
 
         /* Fit map button */
         .btn-fit-map {
@@ -267,6 +287,11 @@
                         <div class="stat-num" id="helpCount">0</div>
                         <div class="stat-lbl">סיוע</div>
                     </div>
+                    <div class="stat-box pending" onclick="togglePendingList()">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-num" id="pendingCount">0</div>
+                        <div class="stat-lbl">לא דווח</div>
+                    </div>
                 </div>
 
                 <button class="btn-fit-map" onclick="fitMapToMarkers()">
@@ -279,6 +304,13 @@
 
             <div class="persons-list" id="personsList">
                 <div class="empty-state">אין דיווחים כרגע<br>ממתין לנתונים...</div>
+            </div>
+
+            <div class="pending-section" id="pendingSection" style="display:none">
+                <div class="pending-header" onclick="togglePendingList()">
+                    ⏳ <span id="pendingHeaderText">לא דיווחו</span> — לחץ לפירוט ▼
+                </div>
+                <div class="pending-names" id="pendingNames"></div>
             </div>
 
             <div class="panel-footer">
@@ -379,48 +411,71 @@
 
         if (visible.length === 0) {
             container.innerHTML = '<div class="empty-state">אין דיווחים פעילים<br>ממתין לדיווחי צוות...</div>';
-            updateCounts();
-            return;
+        } else {
+            // מיון: עזרה → בדרך → בטוח
+            const order = { help: 0, onway: 1, safe: 2 };
+            visible.sort(([,a],[,b]) => (order[a.status]??9) - (order[b.status]??9));
+
+            container.innerHTML = visible.map(([id, data]) => {
+                const status = data.status || 'none';
+                const elapsed = formatElapsed(data.statusTime);
+                const safeId = encodeURIComponent(id);
+
+                return `
+                    <div class="person-card status-${status}" id="card-${safeId}">
+                        <div class="card-top">
+                            <div class="person-name">${data.name || 'אנונימי'}</div>
+                            <div class="person-time">${elapsed}</div>
+                        </div>
+                        <div class="person-status-text ${status}">${statusLabel(status)}</div>
+                        <div class="card-actions">
+                            <button class="btn-waze" data-lat="${data.lat||''}" data-lng="${data.lng||''}">🗺 Waze</button>
+                            <button class="btn-done" data-id="${safeId}">✅ סיים טיפול</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
-
-        // מיון: עזרה → בדרך → בטוח
-        const order = { help: 0, onway: 1, safe: 2 };
-        visible.sort(([,a],[,b]) => (order[a.status]??9) - (order[b.status]??9));
-
-        container.innerHTML = visible.map(([id, data]) => {
-            const status = data.status || 'none';
-            const elapsed = formatElapsed(data.statusTime);
-            const safeId = encodeURIComponent(id);
-
-            return `
-                <div class="person-card status-${status}" id="card-${safeId}">
-                    <div class="card-top">
-                        <div class="person-name">${data.name || 'אנונימי'}</div>
-                        <div class="person-time">${elapsed}</div>
-                    </div>
-                    <div class="person-status-text ${status}">${statusLabel(status)}</div>
-                    <div class="card-actions">
-                        <button class="btn-waze" data-lat="${data.lat||''}" data-lng="${data.lng||''}">🗺 Waze</button>
-                        <button class="btn-done" data-id="${safeId}">✅ סיים טיפול</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
 
         updateCounts();
     }
 
+    function togglePendingList() {
+        const names = document.getElementById('pendingNames');
+        if (names) names.classList.toggle('open');
+    }
+
     function updateCounts() {
         let safe = 0, onway = 0, help = 0;
-        Object.values(allDocs).forEach(data => {
-            if (shouldHide(data)) return;
+        const pendingList = []; // אנשים ללא דיווח
+        Object.entries(allDocs).forEach(([id, data]) => {
+            if (doneDocs.has(id)) return; // טופל
+            if (shouldHide(data)) return; // בטוח ישן
             if (data.status === 'safe')  safe++;
-            if (data.status === 'onway') onway++;
-            if (data.status === 'help')  help++;
+            else if (data.status === 'onway') onway++;
+            else if (data.status === 'help')  help++;
+            else pendingList.push(data.name || 'אנונימי'); // אין דיווח
         });
         document.getElementById('safeCount').textContent  = safe;
         document.getElementById('onwayCount').textContent = onway;
         document.getElementById('helpCount').textContent  = help;
+        document.getElementById('pendingCount').textContent = pendingList.length;
+
+        // עדכון רשימת "לא דווח"
+        const section = document.getElementById('pendingSection');
+        const namesEl = document.getElementById('pendingNames');
+        const headerEl = document.getElementById('pendingHeaderText');
+        if (pendingList.length > 0) {
+            section.style.display = 'block';
+            if (headerEl) headerEl.textContent = `${pendingList.length} לא דיווחו עדיין`;
+            if (namesEl) {
+                namesEl.innerHTML = pendingList.map(n =>
+                    `<div class="pending-name-item">⏳ ${n}</div>`
+                ).join('');
+            }
+        } else {
+            section.style.display = 'none';
+        }
 
         // עדכון מונה מכשירים
         updateDeviceCount();
@@ -749,6 +804,9 @@
             // אם כבר עיבדנו את האזעקה הזו — תעלם
             if (alertId === lastDetectedAlertId) return;
             lastDetectedAlertId = alertId;
+
+            // אזעקה חדשה — נקה "טופל" כדי שכולם יופיעו מחדש
+            doneDocs.clear();
 
             // הצג ברצועת הסטטוס
             if (el) {
