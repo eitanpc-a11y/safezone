@@ -276,6 +276,58 @@
             font-size: 0.78rem; color: #e67e22; text-align: center;
             padding: 8px 16px 0; background: #1a1a1a;
         }
+        /* ===== Install Banner ===== */
+        #installBanner {
+            display: none;
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
+            background: linear-gradient(135deg, #0a1628, #0d2040);
+            border-top: 2px solid rgba(52,152,219,0.5);
+            padding: 14px 16px 20px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+        }
+        #installBanner .install-title {
+            font-size: 0.82rem; font-weight: bold; color: #3498db;
+            margin-bottom: 8px; text-align: center;
+        }
+        #installBanner .install-subtitle {
+            font-size: 0.75rem; color: rgba(255,255,255,0.55);
+            text-align: center; margin-bottom: 10px; line-height: 1.4;
+        }
+        .btn-install-android {
+            display: block; width: 100%; padding: 13px;
+            background: linear-gradient(135deg, #1a6ea3, #2980b9);
+            border: none; border-radius: 12px; color: white;
+            font-size: 0.95rem; font-weight: bold; cursor: pointer;
+            font-family: inherit; margin-bottom: 8px;
+            box-shadow: 0 3px 10px rgba(41,128,185,0.4);
+        }
+        .btn-install-android:active { transform: scale(0.98); }
+        .ios-steps {
+            background: rgba(255,255,255,0.05); border-radius: 10px;
+            padding: 10px 12px; margin-bottom: 8px;
+        }
+        .ios-steps .ios-step {
+            display: flex; align-items: center; gap: 10px;
+            padding: 5px 0; font-size: 0.82rem; color: rgba(255,255,255,0.8);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .ios-steps .ios-step:last-child { border-bottom: none; }
+        .ios-steps .step-icon {
+            font-size: 1.1rem; min-width: 28px; text-align: center;
+        }
+        .ios-share-arrow {
+            display: inline-block;
+            animation: bounce-up 1.5s ease-in-out infinite;
+        }
+        @keyframes bounce-up {
+            0%,100% { transform: translateY(0); }
+            50%      { transform: translateY(-4px); }
+        }
+        .btn-install-dismiss {
+            display: block; width: 100%; padding: 8px;
+            background: transparent; border: none; color: rgba(255,255,255,0.3);
+            font-size: 0.75rem; cursor: pointer; font-family: inherit;
+        }
     </style>
 </head>
 <body>
@@ -533,15 +585,8 @@
             ⚠️ יש לאפשר הרשאות מיקום והתראות בהגדרות הדפדפן.
         </div>
 
-        <!-- הנחיית iOS — מופיעה רק אם iPhone/iPad ב-Safari רגיל (לא PWA) -->
-        <div id="iosHint" style="display:none; margin-top:12px; padding:14px; background:#1a0a00; border:1px solid #7a3200; border-radius:12px; color:#f39c12; font-size:0.85rem; line-height:1.5; text-align:center;">
-            <div style="font-size:1.1rem; margin-bottom:6px;">📱 iPhone / iPad</div>
-            <strong>כדי לקבל התראות ב-iPhone, יש להתקין כ-אפליקציה:</strong><br><br>
-            1. לחץ על <strong>□↑</strong> (כפתור השיתוף) בתחתית Safari<br>
-            2. בחר <strong>"הוסף למסך הבית"</strong><br>
-            3. פתח את SafeZone <strong>ממסך הבית</strong><br>
-            4. אז הירשם מחדש
-        </div>
+        <!-- iosHint מיושן — כעת מטופל ע"י installBanner -->
+        <div id="iosHint" style="display:none"></div>
 
         <!-- פאנל דיווח סטטוס — מוצג אחרי הרשמה -->
         <div id="status-panel">
@@ -610,7 +655,34 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        const messaging = firebase.messaging();
+
+        // messaging עלול להיכשל ב-iOS Safari (לא PWA) או אם SW לא מוכן
+        // אם נכשל — נמשיך בלעדיו, הUI עדיין יוצג נכון
+        let messaging;
+        try {
+            messaging = firebase.messaging();
+        } catch (e) {
+            console.warn('[Init] firebase.messaging() נכשל — ממשיך ללא Push:', e.message);
+            messaging = {
+                getToken: () => Promise.resolve(null),
+                onMessage: () => {},
+                onBackgroundMessage: () => {}
+            };
+        }
+
+        // ===== בטיחות: הצג ממשק "פעיל" מיד אם token קיים =====
+        // גם אם Firebase נכשל לרגע — המשתמש יראה את המצב הנכון
+        window.addEventListener('load', function ensureActiveStateShown() {
+            const token = localStorage.getItem('safezone_token');
+            if (!token) return;
+            const statusPanel = document.getElementById('status-panel');
+            const registerPanel = document.getElementById('register-panel');
+            // אם ממשק ה"רישום" עדיין מוצג למרות שיש token — תקן
+            if (registerPanel && registerPanel.style.display !== 'none') {
+                console.warn('[Fallback] token קיים אך ממשק לא עודכן — מתקן');
+                try { showActiveState(); } catch(e) { /* בטיחות */ }
+            }
+        });
 
         // ---- Early language bootstrap (full system defined later) ----
         var _currentLang = localStorage.getItem('safezone_lang') || 'he';
@@ -780,7 +852,7 @@
         const autoStatus = urlParams.get('status'); // לחיצה על כפתור בנוטיפיקציה
         const alertParam = urlParams.get('alert');  // לחיצה על גוף הנוטיפיקציה
 
-        if (currentToken) {
+        try { if (currentToken) {
             showActiveState();
             startLocationTracking(currentToken);
             startDocListener(currentToken);
@@ -883,6 +955,11 @@
                     }
                 }
             }, 3000);
+        } } catch(e) {
+            // שגיאה בהפעלה — נסה fallback
+            console.error('[Startup] שגיאה:', e.message);
+            const t = localStorage.getItem('safezone_token');
+            if (t) { try { showActiveState(); } catch(_) {} }
         }
 
         // ===== הקשבה להודעות מה-Service Worker =====
@@ -1897,6 +1974,110 @@
                 btn.textContent = '🔔 בדוק שה-Push עובד על הטלפון שלי';
             }
         }
+    </script>
+
+    <!-- ===== Install Banner — הוסף למסך הבית ===== -->
+    <div id="installBanner">
+        <!-- Android content -->
+        <div id="installAndroid" style="display:none">
+            <div class="install-title">📲 הוסף SafeZone למסך הבית</div>
+            <div class="install-subtitle">כדי לקבל התראות חירום — יש להתקין כאפליקציה</div>
+            <button class="btn-install-android" onclick="doAndroidInstall()">
+                ➕ התקן עכשיו — הוסף למסך הבית
+            </button>
+        </div>
+        <!-- iOS content -->
+        <div id="installIOS" style="display:none">
+            <div class="install-title">📱 iPhone / iPad — התקן כאפליקציה</div>
+            <div class="ios-steps">
+                <div class="ios-step">
+                    <span class="step-icon"><span class="ios-share-arrow">⬆️</span></span>
+                    <span>לחץ על <strong>כפתור השיתוף</strong> בתחתית Safari</span>
+                </div>
+                <div class="ios-step">
+                    <span class="step-icon">🏠</span>
+                    <span>בחר <strong>"הוסף למסך הבית"</strong></span>
+                </div>
+                <div class="ios-step">
+                    <span class="step-icon">✅</span>
+                    <span>פתח את <strong>SafeZone</strong> ממסך הבית → הירשם שוב</span>
+                </div>
+            </div>
+        </div>
+        <button class="btn-install-dismiss" onclick="dismissInstallBanner()">לא עכשיו ✕</button>
+    </div>
+
+    <script>
+        // ===== Install Banner Logic =====
+        let deferredInstallPrompt = null;
+
+        // האזן ל-beforeinstallprompt (Android Chrome)
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            showInstallBanner('android');
+        });
+
+        // לאחר התקנה מוצלחת — הסתר
+        window.addEventListener('appinstalled', function() {
+            hideInstallBanner();
+            deferredInstallPrompt = null;
+            console.log('[Install] האפליקציה הותקנה בהצלחה!');
+        });
+
+        function showInstallBanner(platform) {
+            // אם כבר dismissal מ-localStorage — אל תציג שוב
+            if (localStorage.getItem('install_dismissed') === '1') return;
+            const banner = document.getElementById('installBanner');
+            if (!banner) return;
+            if (platform === 'android') {
+                document.getElementById('installAndroid').style.display = 'block';
+                document.getElementById('installIOS').style.display = 'none';
+            } else {
+                document.getElementById('installAndroid').style.display = 'none';
+                document.getElementById('installIOS').style.display = 'block';
+                // הוסף padding לגוף כדי שהבאנר לא יכסה תוכן
+            }
+            banner.style.display = 'block';
+            // הוסף padding לתחתית הדף
+            document.body.style.paddingBottom = '220px';
+        }
+
+        function hideInstallBanner() {
+            const banner = document.getElementById('installBanner');
+            if (banner) banner.style.display = 'none';
+            document.body.style.paddingBottom = '';
+        }
+
+        function dismissInstallBanner() {
+            localStorage.setItem('install_dismissed', '1');
+            hideInstallBanner();
+        }
+
+        async function doAndroidInstall() {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            console.log('[Install] בחירת משתמש:', outcome);
+            if (outcome === 'accepted') hideInstallBanner();
+            deferredInstallPrompt = null;
+        }
+
+        // זיהוי פלטפורמה בטעינה
+        (function detectInstallPlatform() {
+            const isStandalone = window.navigator.standalone === true ||
+                                  window.matchMedia('(display-mode: standalone)').matches;
+            if (isStandalone) return; // כבר מותקן — אל תציג כלום
+
+            const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+            if (isIOS) {
+                // iOS — הצג הנחיות מיד (אין beforeinstallprompt)
+                showInstallBanner('ios');
+            }
+            // Android — ממתין ל-beforeinstallprompt event (נשלח ע"י Chrome אוטומטית)
+        })();
     </script>
 </body>
 </html>
