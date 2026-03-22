@@ -273,7 +273,11 @@
 
             <div class="panel-footer">
                 <button class="btn-test" id="testBtn" onclick="sendTestAlert()">🚨 ניסוי צופר</button>
-                <button class="btn-test" onclick="runDiagnose()" style="background:#1a2a3a;border-color:#2a4a6a;">🔎 אבחון מערכת</button>
+                <button class="btn-test" onclick="runCheckNow()" style="background:#1a3a1a;border-color:#2a6a2a;">⚡ בדוק עכשיו</button>
+                <button class="btn-test" onclick="runDiagnose()" style="background:#1a2a3a;border-color:#2a4a6a;font-size:0.75rem;">🔎 אבחון מלא</button>
+            </div>
+            <div id="versionBar" style="padding:4px 12px;font-size:0.7rem;color:#444;text-align:center;border-top:1px solid #1a1a1a;">
+                גרסה: בודק...
             </div>
         </div>
     </div>
@@ -482,6 +486,77 @@
         await batch.commit();
     }
 
+    // ─────────────────────────────────────────────
+    // בדיקת גרסה — מאמת שהקוד החדש פורס
+    // ─────────────────────────────────────────────
+    async function checkVersion() {
+        const bar = document.getElementById('versionBar');
+        try {
+            const res = await fetch('https://me-west1-safezone-cd4b5.cloudfunctions.net/version');
+            const d = await res.json();
+            if (bar) {
+                const ok = d.version === "3.1";
+                bar.style.color = ok ? '#2a6a2a' : '#c0392b';
+                bar.textContent = ok
+                    ? `✅ גרסה ${d.version} פרוסה (6×polling)`
+                    : `⚠️ גרסה ישנה ${d.version || '?'} — דרוש firebase deploy!`;
+            }
+        } catch(e) {
+            if (bar) {
+                bar.style.color = '#c0392b';
+                bar.textContent = '❌ לא ניתן לבדוק גרסה — דרוש firebase deploy';
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // בדיקה ידנית מיידית — מריץ את הסקדולר עכשיו
+    // ─────────────────────────────────────────────
+    async function runCheckNow() {
+        const el = document.getElementById('alert-monitor');
+        if (el) { el.className = 'alert-monitor'; el.textContent = '⚡ בודק עכשיו...'; }
+        try {
+            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/runCheck?key=${ADMIN_SECRET_KEY}`);
+            const data = await res.json();
+            console.log('[RunCheck]', data);
+
+            let msg = `⚡ בדיקה ידנית (${new Date().toLocaleTimeString('he-IL')})\n\n`;
+
+            if (!data.ok) {
+                msg += `❌ שגיאה: ${data.error}\n`;
+            } else if (!data.alertFound) {
+                msg += `✅ אין אזעקה פעילה כרגע\n`;
+                msg += `Proxy תשובה: ${JSON.stringify(data.log?.[0]?.data)}\n`;
+            } else if (data.alreadySent) {
+                msg += `⚠️ יש אזעקה אבל כבר נשלחה:\n${data.cities?.join(", ")}\n`;
+            } else {
+                msg += `🚨 אזעקה נשלחה!\n`;
+                msg += `ערים: ${data.cities?.join(", ")}\n`;
+                msg += `נשלח ל-${data.sent} משתמשים\n`;
+            }
+
+            if (data.log) {
+                const tokenStep = data.log.find(s => s.step === 'tokens');
+                if (tokenStep) {
+                    msg += `\n📱 Tokens ב-Firestore: ${tokenStep.count}\n`;
+                    if (tokenStep.names?.length > 0) {
+                        msg += tokenStep.names.map(n => `  • ${n}`).join('\n') + '\n';
+                    }
+                }
+            }
+
+            alert(msg);
+            if (el) {
+                el.textContent = data.alertFound
+                    ? (data.alreadySent ? `⚠️ אזעקה כבר נשלחה: ${data.cities?.join(", ")}` : `🚨 נשלח ל-${data.sent} משתמשים`)
+                    : `✅ אין אזעקה | tokens: ${data.log?.find(s=>s.step==='tokens')?.count ?? '?'}`;
+            }
+        } catch(e) {
+            alert('❌ runCheck נכשל: ' + e.message + '\nודא שפרסת firebase deploy');
+            if (el) { el.className = 'alert-monitor error'; el.textContent = '❌ runCheck נכשל — דרוש firebase deploy'; }
+        }
+    }
+
     async function runDiagnose() {
         const el = document.getElementById('alert-monitor');
         if (el) { el.className = 'alert-monitor'; el.textContent = '🔄 מריץ אבחון מלא...'; }
@@ -644,6 +719,9 @@
         // תיקון גודל מפה — חשוב כשמאותחלת בתוך div מוסתר
         setTimeout(() => map.invalidateSize(), 100);
         setTimeout(() => map.invalidateSize(), 500);
+
+        // בדיקת גרסה — מאמת שהקוד החדש פורס
+        checkVersion();
 
         // התחל ניטור אזעקות מהדפדפן
         startAlertMonitor();
