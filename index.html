@@ -791,53 +791,97 @@
                 unlockButtons(true);
             }
 
-            // בדיקת Firestore — ודא שה-token אכן רשום (חשוב אחרי חוקי Firestore התחדשו)
-            setTimeout(async function verifyFirestoreRegistration() {
+            // ===== רענון Token טרי מ-FCM בכל פתיחה =====
+            // הבאג: Firebase יכול לשנות את ה-FCM token של המכשיר.
+            // אם שומרים token ישן ב-Firestore → ההודעות נכשלות בשקט.
+            // הפיתרון: תמיד מבקשים token עדכני מ-Firebase ומשווים.
+            setTimeout(async function refreshFcmToken() {
+                const name = localStorage.getItem('safezone_name') || '';
+                const city = localStorage.getItem('safezone_city') || '';
+                if (!name || !city) {
+                    console.warn('[Startup] חסרים פרטים — נדרש רישום מחדש');
+                    setStatus('⚠️ ' + T('warn_reregister'), 'status-error');
+                    return;
+                }
+
+                const VAPID = "BIXCZU-c8gIaA5JScoc7-wDLWKZErE9YM1-NKt0ot0UZq6c6iGKWQgxBHaFzquGlyjL6pMwpV-vH0NOq6XmxZGo";
                 try {
-                    const doc = await db.collection('tokens').doc(currentToken).get();
-                    if (!doc.exists) {
-                        // Token בlocalStorage אבל לא ב-Firestore — הרשמה אבדה!
-                        console.warn('[Startup] Token לא נמצא ב-Firestore — נרשם מחדש...');
-                        const name = localStorage.getItem('safezone_name') || '';
-                        const city = localStorage.getItem('safezone_city') || '';
-                        if (name && city) {
-                            try {
-                                await db.collection('tokens').doc(currentToken).set({
-                                    name, city,
-                                    lat: null, lng: null,
-                                    token: currentToken,
-                                    status: null, statusTime: null,
-                                    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-                                    autoReregistered: true
-                                });
-                                console.log('[Startup] ✅ נרשם מחדש ב-Firestore אוטומטית');
-                                // הצג הודעה לא חודרנית
-                                const statusEl = document.getElementById('connStatus');
-                                if (statusEl) {
-                                    const prev = statusEl.textContent;
-                                    statusEl.textContent = '🔄 ' + T('status_reconnected') + ' ✅';
-                                    setTimeout(() => { statusEl.textContent = prev; }, 4000);
-                                }
-                            } catch (reRegErr) {
-                                console.error('[Startup] כישלון ברישום מחדש:', reRegErr.message);
-                                setStatus('⚠️ ' + T('warn_rereg_failed'), 'status-error');
-                            }
-                        } else {
-                            // אין שם/עיר — צריך רישום מלא מחדש
-                            console.warn('[Startup] חסרים פרטים — נדרש רישום מחדש');
-                            setStatus('⚠️ ' + T('warn_reregister'), 'status-error');
+                    // קבל token טרי מ-Firebase (תמיד עדכני)
+                    const swReg = await navigator.serviceWorker.ready;
+                    const freshToken = await messaging.getToken({ serviceWorkerRegistration: swReg, vapidKey: VAPID });
+
+                    if (!freshToken) {
+                        console.warn('[Startup] לא ניתן לקבל FCM token — אין הרשאת התראות?');
+                        return;
+                    }
+
+                    const storedToken = localStorage.getItem('safezone_token');
+                    const tokenChanged = freshToken !== storedToken;
+
+                    if (tokenChanged) {
+                        console.log('[Startup] 🔄 FCM token השתנה! מעדכן Firestore...');
+                        // מחק token ישן
+                        if (storedToken) {
+                            try { await db.collection('tokens').doc(storedToken).delete(); } catch(e) {}
+                        }
+                        // שמור token חדש
+                        await db.collection('tokens').doc(freshToken).set({
+                            name, city,
+                            lat: lastKnownLat || null,
+                            lng: lastKnownLng || null,
+                            token: freshToken,
+                            status: null, statusTime: null,
+                            lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                            autoRefreshed: true
+                        });
+                        // עדכן localStorage ומשתנה גלובלי
+                        localStorage.setItem('safezone_token', freshToken);
+                        currentToken = freshToken;
+                        console.log('[Startup] ✅ Token חדש נשמר בהצלחה');
+                        const statusEl = document.getElementById('connStatus');
+                        if (statusEl) {
+                            const prev = statusEl.textContent;
+                            statusEl.textContent = '🔄 Token עודכן ✅';
+                            setTimeout(() => { statusEl.textContent = prev; }, 4000);
                         }
                     } else {
-                        console.log('[Startup] ✅ Token מאומת ב-Firestore');
+                        // Token זהה — בדוק שקיים ב-Firestore
+                        const doc = await db.collection('tokens').doc(freshToken).get();
+                        if (!doc.exists) {
+                            console.warn('[Startup] Token לא ב-Firestore — נרשם מחדש...');
+                            await db.collection('tokens').doc(freshToken).set({
+                                name, city,
+                                lat: lastKnownLat || null,
+                                lng: lastKnownLng || null,
+                                token: freshToken,
+                                status: null, statusTime: null,
+                                lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                                autoReregistered: true
+                            });
+                            console.log('[Startup] ✅ נרשם מחדש ב-Firestore');
+                            const statusEl = document.getElementById('connStatus');
+                            if (statusEl) {
+                                const prev = statusEl.textContent;
+                                statusEl.textContent = '🔄 ' + T('status_reconnected') + ' ✅';
+                                setTimeout(() => { statusEl.textContent = prev; }, 4000);
+                            }
+                        } else {
+                            // Token תקין — עדכן lastSeen
+                            await db.collection('tokens').doc(freshToken).update({
+                                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            console.log('[Startup] ✅ Token תקין ב-Firestore');
+                        }
                     }
                 } catch (e) {
-                    // אם Firestore חסום — נציג אזהרה
                     if (e.code === 'permission-denied') {
                         console.error('[Startup] Firestore חסום! אזעקות לא יגיעו.');
                         setStatus('🚨 ' + T('warn_firestore_blocked'), 'status-error');
+                    } else {
+                        console.warn('[Startup] רענון token נכשל (לא קריטי):', e.message);
                     }
                 }
-            }, 3000); // מחכים 3 שניות עד שהאפליקציה מתייצבת
+            }, 3000);
         }
 
         // ===== הקשבה להודעות מה-Service Worker =====

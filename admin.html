@@ -234,6 +234,16 @@
                 <div id="db-status" style="font-size:0.75rem;color:#555;margin-bottom:6px;text-align:center;">
                     ⏳ מתחבר ל-Firestore...
                 </div>
+
+                <!-- מונה מכשירים רשומים — קריטי לאבחון! -->
+                <div id="deviceCountBanner" style="
+                    background:#3d0000; border:1px solid #7a0000; border-radius:8px;
+                    padding:8px 12px; margin-bottom:8px; text-align:center; font-weight:bold;
+                ">
+                    <div style="font-size:0.7rem;color:#aaa;margin-bottom:2px;">📱 מכשירים רשומים לאזעקות</div>
+                    <div id="deviceCountNum" style="font-size:1.8rem;color:#ff6b6b;line-height:1;">…</div>
+                    <div id="deviceCountMsg" style="font-size:0.7rem;color:#ff9999;margin-top:2px;">בודק...</div>
+                </div>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <div id="alert-monitor" class="alert-monitor" style="flex:1">
                         ⏳ מאתחל ניטור אזעקות...
@@ -411,6 +421,35 @@
         document.getElementById('safeCount').textContent  = safe;
         document.getElementById('onwayCount').textContent = onway;
         document.getElementById('helpCount').textContent  = help;
+
+        // עדכון מונה מכשירים
+        updateDeviceCount();
+    }
+
+    function updateDeviceCount() {
+        const total = Object.keys(allDocs).length;
+        const numEl = document.getElementById('deviceCountNum');
+        const msgEl = document.getElementById('deviceCountMsg');
+        const banner = document.getElementById('deviceCountBanner');
+        if (!numEl) return;
+
+        numEl.textContent = total;
+
+        if (total === 0) {
+            banner.style.background = '#3d0000';
+            banner.style.borderColor = '#9a0000';
+            numEl.style.color = '#ff3333';
+            msgEl.style.color = '#ff9999';
+            msgEl.textContent = '⚠️ אף מכשיר לא רשום — אזעקות לא יישלחו!';
+            msgEl.style.fontWeight = 'bold';
+        } else {
+            banner.style.background = '#003d1a';
+            banner.style.borderColor = '#006633';
+            numEl.style.color = '#5edb8a';
+            msgEl.style.color = '#88ddaa';
+            msgEl.textContent = `✅ ${total} מכשיר${total > 1 ? 'ים' : ''} יקבלו אזעקות`;
+            msgEl.style.fontWeight = 'normal';
+        }
     }
 
     function updateMarker(id, data) {
@@ -496,10 +535,10 @@
             const res = await fetch('https://me-west1-safezone-cd4b5.cloudfunctions.net/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "3.3";
+                const ok = d.version === "3.5";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} — סקדולר תקין (checkAlerts)`
+                    ? `✅ גרסה ${d.version} — תיקון token, 3 מקורות אזעקה`
                     : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש!`;
             }
         } catch(e) {
