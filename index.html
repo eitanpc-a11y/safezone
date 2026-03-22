@@ -328,6 +328,207 @@
             background: transparent; border: none; color: rgba(255,255,255,0.3);
             font-size: 0.75rem; cursor: pointer; font-family: inherit;
         }
+        .btn-ios-guide {
+            display: block; width: 100%; padding: 10px;
+            background: rgba(52,152,219,0.15); border: 1px solid rgba(52,152,219,0.4);
+            border-radius: 10px; color: #3498db;
+            font-size: 0.82rem; font-weight: bold; cursor: pointer;
+            font-family: inherit; margin-bottom: 6px;
+        }
+
+        /* ===== iOS Guide Modal ===== */
+        #iosGuideModal {
+            display: none; position: fixed; inset: 0; z-index: 99999;
+            background: rgba(0,0,0,0.92); overflow-y: auto;
+            padding: 20px 16px 40px;
+            direction: rtl;
+        }
+        .guide-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .guide-header h2 { font-size: 1.1rem; color: #3498db; margin: 0; }
+        .btn-guide-close {
+            background: rgba(255,255,255,0.1); border: none; color: white;
+            width: 36px; height: 36px; border-radius: 50%; font-size: 1.1rem;
+            cursor: pointer; font-family: inherit; flex-shrink: 0;
+        }
+        .guide-step {
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px; padding: 18px 16px; margin-bottom: 16px;
+        }
+        .guide-step-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 50%;
+            background: #2980b9; color: white; font-size: 0.85rem; font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .guide-step-title {
+            font-size: 0.95rem; font-weight: bold; color: white; margin-bottom: 8px;
+        }
+        .guide-step-desc {
+            font-size: 0.8rem; color: rgba(255,255,255,0.6); line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        /* Phone mockup illustrations */
+        .phone-mock {
+            margin: 0 auto;
+            width: 200px; background: #1a1a1a;
+            border-radius: 28px; border: 3px solid #444;
+            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .phone-mock .screen {
+            background: #e8f4f8; min-height: 130px; position: relative;
+        }
+        /* Safari top bar */
+        .safari-bar {
+            background: #f2f2f7; padding: 8px 10px; display: flex;
+            align-items: center; gap: 6px; border-bottom: 1px solid #d0d0d0;
+        }
+        .safari-bar .url-box {
+            flex: 1; background: #ddd; border-radius: 8px; padding: 4px 8px;
+            font-size: 0.6rem; color: #666; text-align: center; font-family: monospace;
+        }
+        .safari-bar .sf-btn {
+            font-size: 0.75rem; color: #007aff; padding: 2px 4px;
+        }
+        /* Safari content */
+        .safari-content {
+            background: #f9f9f9; padding: 10px;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
+        .safari-content .sz-logo-mini {
+            width: 36px; height: 36px; background: linear-gradient(135deg,#1a3a5c,#2980b9);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+        .safari-content .sz-text {
+            font-size: 0.65rem; color: #333; font-weight: bold;
+        }
+        /* Safari bottom bar */
+        .safari-bottom {
+            background: #f2f2f7; border-top: 1px solid #d0d0d0;
+            display: flex; align-items: center; justify-content: space-around;
+            padding: 6px 4px;
+        }
+        .safari-bottom .nav-btn { font-size: 0.85rem; color: #007aff; padding: 2px 6px; }
+        .safari-bottom .share-btn {
+            font-size: 0.9rem; color: #007aff; padding: 2px 6px;
+            position: relative;
+        }
+        .share-btn.pulse-ring::after {
+            content: ''; position: absolute; inset: -4px;
+            border-radius: 8px; border: 2px solid #007aff;
+            animation: pulse-ring 1.2s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+            0%   { transform: scale(1);   opacity: 0.9; }
+            100% { transform: scale(1.7); opacity: 0; }
+        }
+        /* Share sheet */
+        .share-sheet {
+            background: rgba(0,0,0,0.5); position: relative;
+        }
+        .share-sheet-inner {
+            background: #f2f2f7; border-radius: 14px 14px 0 0;
+            padding: 12px 10px 8px;
+        }
+        .share-sheet-title {
+            text-align: center; font-size: 0.6rem; color: #888; margin-bottom: 8px;
+        }
+        .share-row {
+            display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;
+            justify-content: flex-start;
+        }
+        .share-icon-item {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            flex-shrink: 0; width: 44px;
+        }
+        .share-icon-circle {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: white; display: flex; align-items: center;
+            justify-content: center; font-size: 1rem;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        .share-icon-circle.highlighted {
+            background: #e8f4ff; border: 2px solid #007aff;
+            animation: item-pulse 1s ease-in-out infinite alternate;
+        }
+        @keyframes item-pulse {
+            from { box-shadow: 0 0 0 0 rgba(0,122,255,0.4); }
+            to   { box-shadow: 0 0 0 6px rgba(0,122,255,0); }
+        }
+        .share-icon-label {
+            font-size: 0.48rem; color: #333; text-align: center; line-height: 1.2;
+        }
+        .share-icon-label.blue { color: #007aff; font-weight: bold; }
+        /* Add dialog */
+        .add-dialog {
+            background: rgba(0,0,0,0.4); padding: 8px;
+        }
+        .add-dialog-inner {
+            background: white; border-radius: 14px; padding: 10px;
+        }
+        .add-dialog-title {
+            font-size: 0.65rem; font-weight: bold; color: #333;
+            text-align: center; margin-bottom: 6px;
+        }
+        .add-dialog-row {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+        }
+        .add-dialog-icon {
+            width: 32px; height: 32px; background: linear-gradient(135deg,#1a3a5c,#2980b9);
+            border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; font-size: 1rem; flex-shrink: 0;
+        }
+        .add-dialog-name { font-size: 0.65rem; color: #333; }
+        .add-btn {
+            display: block; width: 100%; background: #007aff;
+            border-radius: 10px; padding: 5px; text-align: center;
+            font-size: 0.6rem; color: white; font-weight: bold;
+        }
+        /* Home screen */
+        .homescreen {
+            background: linear-gradient(180deg, #1c3a5c 0%, #4a90c4 100%);
+            padding: 16px 10px 10px; min-height: 130px;
+        }
+        .app-icons-row {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .app-icon-item {
+            display: flex; flex-direction: column; align-items: center; gap: 3px;
+            width: 44px;
+        }
+        .app-icon-box {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: rgba(255,255,255,0.25);
+        }
+        .app-icon-box.safezone-icon {
+            background: linear-gradient(135deg,#1a3a5c,#2980b9);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+            animation: icon-appear 0.5s ease-out;
+            box-shadow: 0 0 0 3px rgba(52,152,219,0.6), 0 0 0 6px rgba(52,152,219,0.2);
+        }
+        @keyframes icon-appear {
+            from { transform: scale(0.5); opacity: 0; }
+            to   { transform: scale(1);   opacity: 1; }
+        }
+        .app-icon-label {
+            font-size: 0.48rem; color: white; text-align: center;
+        }
+        .app-icon-label.bright { font-weight: bold; text-shadow: 0 0 4px rgba(255,255,255,0.8); }
+        /* Guide footer */
+        .guide-footer {
+            margin-top: 10px; text-align: center;
+        }
+        .btn-guide-done {
+            padding: 14px 40px; background: linear-gradient(135deg, #1a6ea3, #2980b9);
+            border: none; border-radius: 14px; color: white;
+            font-size: 1rem; font-weight: bold; cursor: pointer; font-family: inherit;
+            box-shadow: 0 4px 14px rgba(41,128,185,0.4);
+        }
     </style>
 </head>
 <body>
@@ -2003,8 +2204,163 @@
                     <span>פתח את <strong>SafeZone</strong> ממסך הבית → הירשם שוב</span>
                 </div>
             </div>
+            <button class="btn-ios-guide" onclick="openIOSGuide()">📖 מדריך מפורט עם תמונות ←</button>
         </div>
         <button class="btn-install-dismiss" onclick="dismissInstallBanner()">לא עכשיו ✕</button>
+    </div>
+
+    <!-- ===== iOS Guide Modal — מדריך מפורט ===== -->
+    <div id="iosGuideModal">
+        <div class="guide-header">
+            <h2>📱 מדריך התקנה — iPhone</h2>
+            <button class="btn-guide-close" onclick="closeIOSGuide()">✕</button>
+        </div>
+
+        <!-- שלב 1 -->
+        <div class="guide-step">
+            <div class="guide-step-num">1</div>
+            <div class="guide-step-title">פתח את SafeZone ב-Safari</div>
+            <div class="guide-step-desc">
+                חשוב: ההתקנה עובדת <strong style="color:#f39c12">רק דרך Safari</strong>.<br>
+                אם אתה ב-Chrome או Firefox — העתק את הכתובת ופתח ב-Safari.
+            </div>
+            <div class="phone-mock">
+                <div class="safari-bar">
+                    <span class="sf-btn">◀</span>
+                    <span class="sf-btn">▶</span>
+                    <span class="url-box">safezone-cd4b5.web.app</span>
+                    <span class="sf-btn">⊕</span>
+                </div>
+                <div class="safari-content">
+                    <div class="sz-logo-mini">🛡️</div>
+                    <div class="sz-text">SafeZone</div>
+                    <div style="font-size:0.55rem;color:#666;text-align:center">מערכת הגנה לצוותי חירום</div>
+                </div>
+                <div class="safari-bottom">
+                    <span class="nav-btn">◀</span>
+                    <span class="nav-btn">▶</span>
+                    <span class="share-btn pulse-ring">⬆️</span>
+                    <span class="nav-btn">⊡</span>
+                    <span class="nav-btn">≡</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- שלב 2 -->
+        <div class="guide-step">
+            <div class="guide-step-num">2</div>
+            <div class="guide-step-title">לחץ על כפתור השיתוף ⬆️</div>
+            <div class="guide-step-desc">
+                הכפתור נמצא <strong>בשורת הכלים התחתונה</strong> של Safari —<br>
+                הריבוע עם החץ למעלה. יופיע תפריט שיתוף.
+            </div>
+            <div class="phone-mock">
+                <div style="background:#f2f2f7; padding: 6px 10px; border-bottom: 1px solid #ccc;">
+                    <div style="background:#ddd;border-radius:8px;padding:3px 8px;font-size:0.55rem;color:#666;text-align:center">safezone-cd4b5.web.app</div>
+                </div>
+                <div class="share-sheet">
+                    <div style="height:30px;background:#f9f9f9;display:flex;align-items:center;justify-content:center;">
+                        <span style="font-size:0.55rem;color:#666">SafeZone</span>
+                    </div>
+                    <div class="share-sheet-inner">
+                        <div class="share-sheet-title">שתף דף זה</div>
+                        <div class="share-row">
+                            <div class="share-icon-item">
+                                <div class="share-icon-circle">✉️</div>
+                                <div class="share-icon-label">דוא"ל</div>
+                            </div>
+                            <div class="share-icon-item">
+                                <div class="share-icon-circle">💬</div>
+                                <div class="share-icon-label">הודעות</div>
+                            </div>
+                            <div class="share-icon-item">
+                                <div class="share-icon-circle highlighted">🏠</div>
+                                <div class="share-icon-label blue">הוסף למסך</div>
+                            </div>
+                            <div class="share-icon-item">
+                                <div class="share-icon-circle">📋</div>
+                                <div class="share-icon-label">העתק</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- שלב 3 -->
+        <div class="guide-step">
+            <div class="guide-step-num">3</div>
+            <div class="guide-step-title">בחר "הוסף למסך הבית" ← לחץ "הוסף"</div>
+            <div class="guide-step-desc">
+                בתפריט השיתוף גלול מטה ומצא <strong>"הוסף למסך הבית"</strong>.<br>
+                יופיע חלון אישור — לחץ <strong style="color:#3498db">"הוסף"</strong> בפינה הימנית עליונה.
+            </div>
+            <div class="phone-mock">
+                <div class="add-dialog">
+                    <div style="height:50px;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;">
+                        <span style="font-size:0.55rem;color:rgba(255,255,255,0.4)">Safari</span>
+                    </div>
+                    <div class="add-dialog-inner">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:0.6rem;color:#007aff">ביטול</span>
+                            <span style="font-size:0.65rem;font-weight:bold;color:#333">הוסף למסך הבית</span>
+                            <span style="font-size:0.65rem;font-weight:bold;color:#007aff;
+                                border:1px solid #007aff;border-radius:6px;padding:2px 6px;
+                                animation:item-pulse 1s ease-in-out infinite alternate;">הוסף</span>
+                        </div>
+                        <div class="add-dialog-row">
+                            <div class="add-dialog-icon">🛡️</div>
+                            <div>
+                                <div class="add-dialog-name" style="font-weight:bold">SafeZone</div>
+                                <div class="add-dialog-name" style="color:#999">safezone-cd4b5.web.app</div>
+                            </div>
+                        </div>
+                        <div style="font-size:0.55rem;color:#999;text-align:center;margin-top:4px">
+                            תוצג קיצור דרך על מסך הבית
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- שלב 4 -->
+        <div class="guide-step">
+            <div class="guide-step-num">4</div>
+            <div class="guide-step-title">פתח SafeZone ממסך הבית — הירשם מחדש</div>
+            <div class="guide-step-desc">
+                האפליקציה תופיע על מסך הבית שלך.<br>
+                <strong>פתח אותה משם</strong> (לא מ-Safari!) ואז <strong>הירשם מחדש</strong> — רק כך תקבל התראות חירום.
+            </div>
+            <div class="phone-mock">
+                <div class="homescreen">
+                    <div class="app-icons-row">
+                        <div class="app-icon-item">
+                            <div class="app-icon-box"></div>
+                            <div class="app-icon-label"></div>
+                        </div>
+                        <div class="app-icon-item">
+                            <div class="app-icon-box"></div>
+                            <div class="app-icon-label"></div>
+                        </div>
+                        <div class="app-icon-item">
+                            <div class="app-icon-box safezone-icon">🛡️</div>
+                            <div class="app-icon-label bright">SafeZone</div>
+                        </div>
+                        <div class="app-icon-item">
+                            <div class="app-icon-box"></div>
+                            <div class="app-icon-label"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;text-align:center;font-size:0.6rem;color:rgba(255,255,255,0.7)">
+                        ← פתח מכאן לאחר ההתקנה
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="guide-footer">
+            <button class="btn-guide-done" onclick="closeIOSGuide()">✅ הבנתי — סגור מדריך</button>
+        </div>
     </div>
 
     <script>
@@ -2052,6 +2408,22 @@
         function dismissInstallBanner() {
             localStorage.setItem('install_dismissed', '1');
             hideInstallBanner();
+        }
+
+        function openIOSGuide() {
+            const modal = document.getElementById('iosGuideModal');
+            if (modal) {
+                modal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeIOSGuide() {
+            const modal = document.getElementById('iosGuideModal');
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
         }
 
         async function doAndroidInstall() {
