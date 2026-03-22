@@ -871,17 +871,41 @@
             };
         }
 
-        // ===== בטיחות: הצג ממשק "פעיל" מיד אם token קיים =====
-        // גם אם Firebase נכשל לרגע — המשתמש יראה את המצב הנכון
-        window.addEventListener('load', function ensureActiveStateShown() {
+        // ===== בטיחות רב-שכבתית: הצג ממשק "פעיל" בכל מצב אפשרי =====
+
+        function _safeShowActive() {
             const token = localStorage.getItem('safezone_token');
             if (!token) return;
-            const statusPanel = document.getElementById('status-panel');
-            const registerPanel = document.getElementById('register-panel');
-            // אם ממשק ה"רישום" עדיין מוצג למרות שיש token — תקן
-            if (registerPanel && registerPanel.style.display !== 'none') {
-                console.warn('[Fallback] token קיים אך ממשק לא עודכן — מתקן');
-                try { showActiveState(); } catch(e) { /* בטיחות */ }
+            try { showActiveState(); } catch(e) {}
+        }
+
+        // שכבה 1: window.load — תמיד, ללא תנאי
+        window.addEventListener('load', function() {
+            _safeShowActive();
+        });
+
+        // שכבה 2: pageshow — מכסה bfcache (דף ששוחזר מהמטמון)
+        // זה המקרה הנפוץ ביותר כש-PWA נסגר ונפתח מחדש
+        window.addEventListener('pageshow', function(e) {
+            _safeShowActive();
+            if (e.persisted) {
+                // הדף שוחזר מ-bfcache — הסקריפט לא רץ מחדש!
+                console.log('[Pageshow] bfcache restore — מרענן ממשק');
+                _safeShowActive();
+                // גם רענן token אם צריך
+                const token = localStorage.getItem('safezone_token');
+                if (token && !currentToken) {
+                    currentToken = token;
+                    try { startLocationTracking(token); } catch(_) {}
+                    try { if (!docUnsubscribe) startDocListener(token); } catch(_) {}
+                }
+            }
+        });
+
+        // שכבה 3: visibilitychange — כשהאפליקציה חוזרת לפוקוס (מינימיזציה)
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                _safeShowActive();
             }
         });
 
