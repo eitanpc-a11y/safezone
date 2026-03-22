@@ -10,37 +10,46 @@
       "firestore.rules",
       "firestore.indexes.json"
     ],
-    "rewrites": [],
+    "rewrites": [
+      {
+        "source": "/api/sendManualAlert",
+        "function": { "functionId": "sendManualAlert", "region": "me-west1" }
+      },
+      {
+        "source": "/api/version",
+        "function": { "functionId": "version", "region": "me-west1" }
+      },
+      {
+        "source": "/api/schedulerLogs",
+        "function": { "functionId": "schedulerLogs", "region": "me-west1" }
+      },
+      {
+        "source": "/api/runCheck",
+        "function": { "functionId": "runCheck", "region": "me-west1" }
+      },
+      {
+        "source": "/api/diagnose",
+        "function": { "functionId": "diagnose", "region": "me-west1" }
+      }
+    ],
     "headers": [
       {
         "source": "**/*.html",
         "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
         ]
       },
       {
         "source": "firebase-messaging-sw.js",
         "headers": [
-          {
-            "key": "Service-Worker-Allowed",
-            "value": "/"
-          },
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
+          { "key": "Service-Worker-Allowed", "value": "/" },
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
         ]
       },
       {
         "source": "manifest.json",
         "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache"
-          }
+          { "key": "Cache-Control", "value": "no-cache" }
         ]
       }
     ]

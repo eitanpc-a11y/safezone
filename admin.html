@@ -532,13 +532,13 @@
     async function checkVersion() {
         const bar = document.getElementById('versionBar');
         try {
-            const res = await fetch('https://me-west1-safezone-cd4b5.cloudfunctions.net/version');
+            const res = await fetch('/api/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "3.5";
+                const ok = d.version === "3.6";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} — תיקון token, 3 מקורות אזעקה`
+                    ? `✅ גרסה ${d.version} — invoker public, rewrites, תיקון token`
                     : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש!`;
             }
         } catch(e) {
@@ -556,7 +556,7 @@
         const el = document.getElementById('alert-monitor');
         if (el) { el.className = 'alert-monitor'; el.textContent = '⚡ בודק עכשיו...'; }
         try {
-            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/runCheck?key=${ADMIN_SECRET_KEY}`);
+            const res = await fetch(`/api/runCheck?key=${ADMIN_SECRET_KEY}`);
             const data = await res.json();
             console.log('[RunCheck]', data);
 
@@ -602,7 +602,7 @@
     // ─────────────────────────────────────────────
     async function showSchedulerLogs() {
         try {
-            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/schedulerLogs?key=${ADMIN_SECRET_KEY}`);
+            const res = await fetch(`/api/schedulerLogs?key=${ADMIN_SECRET_KEY}`);
             const data = await res.json();
 
             if (!data.ok) {
@@ -657,7 +657,7 @@
         const el = document.getElementById('alert-monitor');
         if (el) { el.className = 'alert-monitor'; el.textContent = '🔄 מריץ אבחון מלא...'; }
         try {
-            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/diagnose?key=${ADMIN_SECRET_KEY}`);
+            const res = await fetch(`/api/diagnose?key=${ADMIN_SECRET_KEY}`);
             const data = await res.json();
             console.log('[Diagnose]', data);
 
@@ -690,7 +690,7 @@
         const btn = document.getElementById('testBtn');
         btn.disabled = true; btn.textContent = 'שולח...';
         try {
-            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/sendManualAlert?key=${ADMIN_SECRET_KEY}`);
+            const res = await fetch(`/api/sendManualAlert?key=${ADMIN_SECRET_KEY}`);
             alert("✅ " + await res.text());
         } catch(e) { alert("❌ שגיאה: " + e.message); }
         finally { btn.disabled = false; btn.textContent = '🚨 ניסוי צופר'; }
