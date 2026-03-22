@@ -496,11 +496,11 @@
             const res = await fetch('https://me-west1-safezone-cd4b5.cloudfunctions.net/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "3.2";
+                const ok = d.version === "3.3";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} (5×polling, לוג Firestore, timeout 120s)`
-                    : `⚠️ גרסה ישנה ${d.version || '?'} — דרוש firebase deploy חדש!`;
+                    ? `✅ גרסה ${d.version} — סקדולר תקין (checkAlerts)`
+                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש!`;
             }
         } catch(e) {
             if (bar) {
