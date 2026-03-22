@@ -705,10 +705,10 @@
             const res = await fetch('/api/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "3.6";
+                const ok = d.version === "3.8";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} — invoker public, rewrites, תיקון token`
+                    ? `✅ גרסה ${d.version} — צפצוף חירום, תזכורת push, לא דווח`
                     : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש!`;
             }
         } catch(e) {
