@@ -274,9 +274,10 @@
             <div class="panel-footer">
                 <button class="btn-test" id="testBtn" onclick="sendTestAlert()">🚨 ניסוי צופר</button>
                 <button class="btn-test" onclick="runCheckNow()" style="background:#1a3a1a;border-color:#2a6a2a;">⚡ בדוק עכשיו</button>
+                <button class="btn-test" onclick="showSchedulerLogs()" style="background:#2a1a0a;border-color:#6a3a0a;font-size:0.75rem;">📋 לוגי סקדולר</button>
                 <button class="btn-test" onclick="runDiagnose()" style="background:#1a2a3a;border-color:#2a4a6a;font-size:0.75rem;">🔎 אבחון מלא</button>
             </div>
-            <div id="versionBar" style="padding:4px 12px;font-size:0.7rem;color:#444;text-align:center;border-top:1px solid #1a1a1a;">
+            <div id="versionBar" style="padding:6px 12px;font-size:0.75rem;color:#444;text-align:center;border-top:1px solid #1a1a1a;font-weight:bold;">
                 גרסה: בודק...
             </div>
         </div>
@@ -495,11 +496,11 @@
             const res = await fetch('https://me-west1-safezone-cd4b5.cloudfunctions.net/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "3.1";
+                const ok = d.version === "3.2";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} פרוסה (6×polling)`
-                    : `⚠️ גרסה ישנה ${d.version || '?'} — דרוש firebase deploy!`;
+                    ? `✅ גרסה ${d.version} (5×polling, לוג Firestore, timeout 120s)`
+                    : `⚠️ גרסה ישנה ${d.version || '?'} — דרוש firebase deploy חדש!`;
             }
         } catch(e) {
             if (bar) {
@@ -554,6 +555,62 @@
         } catch(e) {
             alert('❌ runCheck נכשל: ' + e.message + '\nודא שפרסת firebase deploy');
             if (el) { el.className = 'alert-monitor error'; el.textContent = '❌ runCheck נכשל — דרוש firebase deploy'; }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // הצגת לוגי סקדולר — מה בדיוק קרה בכל ריצה
+    // ─────────────────────────────────────────────
+    async function showSchedulerLogs() {
+        try {
+            const res = await fetch(`https://me-west1-safezone-cd4b5.cloudfunctions.net/schedulerLogs?key=${ADMIN_SECRET_KEY}`);
+            const data = await res.json();
+
+            if (!data.ok) {
+                alert('❌ שגיאה: ' + (data.error || 'לא ידוע') + '\nודא שפרסת firebase deploy');
+                return;
+            }
+
+            let msg = `📋 לוגי סקדולר (${new Date().toLocaleTimeString('he-IL')})\n`;
+            msg += `────────────────────────────────\n`;
+            msg += `📱 Tokens ב-Firestore: ${data.tokenCount}\n`;
+            if (data.tokenNames?.length > 0) {
+                msg += `משתמשים: ${data.tokenNames.join(', ')}\n`;
+            }
+            msg += `\n`;
+
+            if (!data.entries || data.entries.length === 0) {
+                msg += `⚠️ אין לוגים עדיין.\n`;
+                msg += `האם הסקדולר רץ? (דרוש firebase deploy)\n`;
+                msg += `אם כן, הלוגים יופיעו בדקה הבאה.\n`;
+            } else {
+                msg += `ריצות אחרונות (${data.entries.length}):\n`;
+                data.entries.slice(0, 10).forEach((e, i) => {
+                    const t = new Date(e.ts).toLocaleString('he-IL');
+                    const alertPart = e.alertFound ? `🚨 אזעקה!` : `✅ ללא אזעקה`;
+                    const tokenPart = e.tokenCount != null ? ` | tokens: ${e.tokenCount}` : '';
+                    msg += `\n[${t}]\n  ${alertPart}${tokenPart}\n`;
+
+                    if (e.polls) {
+                        const errors = e.polls.filter(p => p.reason === 'error');
+                        if (errors.length > 0) {
+                            msg += `  ⚠️ שגיאות (${errors.length}): ${errors[0].error}\n`;
+                        }
+                        if (e.alertFound) {
+                            const sentPoll = e.polls.find(p => p.sent);
+                            if (sentPoll) {
+                                msg += `  ✅ נשלח: ${sentPoll.cities?.join(', ')}\n`;
+                            }
+                        }
+                    }
+                });
+                msg += `\n────────────────────────────────\n`;
+                msg += `ריצה אחרונה: ${new Date(data.lastRun).toLocaleString('he-IL')}\n`;
+            }
+
+            alert(msg);
+        } catch(e) {
+            alert('❌ schedulerLogs נכשל: ' + e.message + '\nודא שפרסת firebase deploy v3.2');
         }
     }
 
