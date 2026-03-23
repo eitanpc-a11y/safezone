@@ -778,6 +778,10 @@
 
         <div id="status" data-i18n="status_inactive">המערכת לא פעילה</div>
         <div id="loc-info"></div>
+
+        <!-- אזהרת גרסת שרת — מוצגת אוטומטית אם השרת לא פורס -->
+        <div id="server-version-banner" style="display:none; margin:10px 0; padding:10px 14px; background:#7b1a1a; color:#fff; border-radius:10px; font-size:0.82rem; line-height:1.5; text-align:center; direction:rtl;"></div>
+
         <button id="updateLocBtn" onclick="updateLocation()" style="display:none; margin-top:6px; background:none; border:none; color:var(--text-muted); font-size:0.78rem; cursor:pointer; text-decoration:underline; font-family:inherit;" data-i18n="btn_update_loc">
             📍 עדכן מיקום ידנית
         </button>
@@ -1104,33 +1108,34 @@
                     return;
                 }
 
+                // בדוק מרחק — מצב קשוח: רק GPS + geocoding מוצלח + בטווח
                 let nearby = false;
-                let anyCityGeocoded = false; // האם לפחות עיר אחת עברה geocoding
+                let anyCityGeocoded = false;
 
                 for (const city of cities) {
                     const coords = await geocodeCityUser(city);
                     if (!coords) {
-                        // geocoding נכשל לעיר זו — דלג לעיר הבאה (כמו השרת)
+                        // geocoding נכשל לעיר זו — דלג, אל תניח כלום
                         console.log(`[UserPoll] ⚠️ geocoding נכשל: ${city} — מדלג`);
                         continue;
                     }
                     anyCityGeocoded = true;
                     const dist = haversineKmUser(uLat, uLng, coords.lat, coords.lng);
                     console.log(`[UserPoll] ${city}: ${dist.toFixed(1)}ק"מ ממני`);
-                    if (dist <= 20) {
+                    if (dist <= 10) {
                         nearby = true;
                         break;
                     }
                 }
 
-                // geocoding נכשל לכל הערים — fallback בטוח: הצג (כמו השרת)
+                // geocoding נכשל לכל הערים — מצב קשוח: לא מציג שום דבר
                 if (!anyCityGeocoded) {
-                    console.log('[UserPoll] ⚠️ geocoding נכשל לכל הערים — מציג כ-safe fallback');
-                    nearby = true;
+                    console.log('[UserPoll] ⛔ geocoding נכשל לכל הערים — לא מציג (מצב קשוח)');
+                    return;
                 }
 
                 if (!nearby) {
-                    console.log('[UserPoll] 🚫 אזעקה רחוקה — לא מציג');
+                    console.log('[UserPoll] 🚫 אזעקה רחוקה מ-20ק"מ — לא מציג');
                     return;
                 }
 
@@ -1409,9 +1414,31 @@
             const name = localStorage.getItem('safezone_name') || '';
             const city = localStorage.getItem('safezone_city') || '';
             if (lastKnownLat && lastKnownLng) {
-                el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#2ecc71;">📍 GPS פעיל</span>`;
+                el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#2ecc71;">📍 GPS פעיל</span> <span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">(${lastKnownLat.toFixed(4)}, ${lastKnownLng.toFixed(4)})</span>`;
             } else {
                 el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#e67e22;cursor:pointer;text-decoration:underline;" onclick="triggerGpsUpdate()">⚠️ אין GPS — לחץ לעדכון</span>`;
+            }
+        }
+
+        // בדיקת גרסת שרת בהפעלה — מזהיר אם ישן
+        const REQUIRED_SERVER_VERSION = "4.5";
+        async function checkServerVersion() {
+            const banner = document.getElementById('server-version-banner');
+            if (!banner) return;
+            try {
+                const res = await fetch('/api/version');
+                const d = await res.json();
+                if (d.version !== REQUIRED_SERVER_VERSION) {
+                    banner.style.display = 'block';
+                    banner.innerHTML = `⛔ שרת ישן! גרסה ${d.version || '?'} — התראות נשלחות לכולם ללא סינון GPS!<br>
+                        <strong>חובה להריץ: <code>firebase deploy --only functions,hosting</code></strong>`;
+                } else {
+                    // גרסה נכונה — הסתר
+                    banner.style.display = 'none';
+                }
+            } catch(e) {
+                banner.style.display = 'block';
+                banner.innerHTML = '⚠️ לא ניתן לבדוק גרסת שרת — בדוק חיבור אינטרנט';
             }
         }
 
@@ -1460,6 +1487,9 @@
             // רענן GPS מיד בפתיחת האפ — מבטיח שה-Firestore תמיד מעודכן
             const token = localStorage.getItem('safezone_token');
             if (token) _refreshGpsNow(token);
+
+            // בדוק גרסת שרת — הצג אזהרה אם ישן
+            checkServerVersion();
         }
 
         // רענון GPS מיידי — נקרא בכל פתיחת אפ
