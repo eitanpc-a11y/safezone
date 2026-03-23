@@ -30,6 +30,10 @@
       {
         "source": "/api/diagnose",
         "function": { "functionId": "diagnose", "region": "me-west1" }
+      },
+      {
+        "source": "/api/proxyLogs",
+        "function": { "functionId": "proxyLogs", "region": "me-west1" }
       }
     ],
     "headers": [

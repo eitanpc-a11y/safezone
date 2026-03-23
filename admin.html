@@ -345,6 +345,7 @@
                 <button class="btn-test" id="testBtn" onclick="sendTestAlert()">🚨 ניסוי צופר</button>
                 <button class="btn-test" onclick="runCheckNow()" style="background:#1a3a1a;border-color:#2a6a2a;">⚡ בדוק עכשיו</button>
                 <button class="btn-test" onclick="showSchedulerLogs()" style="background:#2a1a0a;border-color:#6a3a0a;font-size:0.75rem;">📋 לוגי סקדולר</button>
+                <button class="btn-test" onclick="showProxyLogs()" style="background:#0a1a2a;border-color:#0a3a6a;font-size:0.75rem;">🔍 לוגי פרוקסי</button>
                 <button class="btn-test" onclick="runDiagnose()" style="background:#1a2a3a;border-color:#2a4a6a;font-size:0.75rem;">🔎 אבחון מלא</button>
             </div>
             <div id="versionBar" style="padding:6px 12px;font-size:0.75rem;color:#444;text-align:center;border-top:1px solid #1a1a1a;font-weight:bold;">
@@ -705,11 +706,11 @@
             const res = await fetch('/api/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "4.1";
+                const ok = d.version === "4.2";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} — timeout 20s, tzevaadom גיבוי, DST מתוקן, היסטוריה 15 דקות`
-                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש!`;
+                    ? `✅ גרסה ${d.version} — tzevaadom ראשון, לוג פרוקסי, זיהוי חסימה, 4 מקורות`
+                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש! (נוכחית: 4.2)`;
             }
         } catch(e) {
             if (bar) {
@@ -820,6 +821,65 @@
             alert(msg);
         } catch(e) {
             alert('❌ schedulerLogs נכשל: ' + e.message + '\nודא שפרסת firebase deploy v3.2');
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // לוגי פרוקסי — מה בדיוק קרה בכל קריאה לפרוקסי?
+    // ─────────────────────────────────────────────
+    async function showProxyLogs() {
+        try {
+            const res = await fetch(`/api/proxyLogs?key=${ADMIN_SECRET_KEY}`);
+            const data = await res.json();
+            if (!data.ok) { alert('❌ ' + (data.error || data.msg)); return; }
+
+            let msg = `🔍 לוגי פרוקסי (${new Date().toLocaleTimeString('he-IL')})\n`;
+            msg += `סה"כ רשומות: ${data.entries?.length ?? 0}\n`;
+            msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+            if (!data.entries || data.entries.length === 0) {
+                msg += '⚠️ אין לוגים עדיין — המתן לריצה הראשונה של הסקדולר\n';
+            } else {
+                for (const e of data.entries.slice(0, 15)) {
+                    const t = new Date(e.ts).toLocaleTimeString('he-IL');
+                    const result = e.result || '?';
+                    const icon = result.includes('blocked') ? '❌' :
+                                 result === 'no_alert' || result === 'no_alert_found' ? '✅' :
+                                 result === 'tzevaadom' ? '🟢' :
+                                 result.startsWith('oref') ? '🔵' : '❓';
+                    msg += `[${t}] ${icon} ${result}\n`;
+                    const s = e.steps || {};
+                    if (s.tzevaadom) {
+                        const tz = s.tzevaadom;
+                        msg += `  tzevaadom: ${tz.ok ? `✓ (${tz.count ?? '?'} אזעקות)` : `✗ ${tz.err || ''}`}`;
+                        if (tz.found) msg += ` → ${(tz.cities || []).join(', ')}`;
+                        msg += '\n';
+                    }
+                    if (s.orefRealTime) {
+                        const rt = s.orefRealTime;
+                        msg += `  oref real-time: ${rt.ok ? `✓ (status=${rt.status})` : `✗ ${rt.err || ''}`}`;
+                        if (rt.found) msg += ` → ${(rt.cities || []).join(', ')}`;
+                        msg += '\n';
+                    }
+                    if (s.orefHistory) {
+                        const h = s.orefHistory;
+                        msg += `  history: ${h.ok ? `✓ (${h.count ?? '?'} רשומות, age=${h.ageSec ?? '?'}s)` : `✗ ${h.err || ''}`}`;
+                        if (h.found) msg += ` → ${(h.cities || []).join(', ')}`;
+                        if (h.note) msg += ` [${h.note}]`;
+                        msg += '\n';
+                    }
+                    if (s.getAlerts) {
+                        const ga = s.getAlerts;
+                        msg += `  GetAlerts: ${ga.ok ? `✓` : `✗ ${ga.err || ''}`}`;
+                        if (ga.found) msg += ` → ${(ga.cities || []).join(', ')}`;
+                        msg += '\n';
+                    }
+                    msg += '\n';
+                }
+            }
+            alert(msg);
+        } catch(e) {
+            alert('❌ proxyLogs נכשל: ' + e.message);
         }
     }
 
