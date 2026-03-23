@@ -963,7 +963,75 @@
             }
         }
 
-        // ===== ניטור אזעקות מהטלפון (IP ישראלי — לא נחסם) =====
+        // ===== ניטור אזעקות מהטלפון + טבלת ערים סטטית =====
+        const ISRAEL_CITIES_CLIENT = {
+            "תל אביב": {lat:32.0853,lng:34.7818}, "תל אביב - יפו": {lat:32.0853,lng:34.7818},
+            "ירושלים": {lat:31.7683,lng:35.2137}, "חיפה": {lat:32.7940,lng:34.9896},
+            "ראשון לציון": {lat:31.9730,lng:34.7925}, "פתח תקווה": {lat:32.0843,lng:34.8878},
+            "אשדוד": {lat:31.8040,lng:34.6550}, "נתניה": {lat:32.3215,lng:34.8532},
+            "באר שבע": {lat:31.2524,lng:34.7913}, "בני ברק": {lat:32.0809,lng:34.8338},
+            "חולון": {lat:32.0109,lng:34.7796}, "רמת גן": {lat:32.0704,lng:34.8238},
+            "אשקלון": {lat:31.6688,lng:34.5745}, "רחובות": {lat:31.8928,lng:34.8113},
+            "בת ים": {lat:32.0232,lng:34.7506}, "הרצליה": {lat:32.1664,lng:34.8437},
+            "כפר סבא": {lat:32.1757,lng:34.9074}, "מודיעין": {lat:31.8986,lng:35.0103},
+            "מודיעין-מכבים-רעות": {lat:31.8986,lng:35.0103}, "בית שמש": {lat:31.7519,lng:34.9875},
+            "נס ציונה": {lat:31.9301,lng:34.7981}, "רמלה": {lat:31.9297,lng:34.8694},
+            "לוד": {lat:31.9516,lng:34.8952}, "עפולה": {lat:32.6073,lng:35.2896},
+            "נהריה": {lat:33.0047,lng:35.0921}, "נחריה": {lat:33.0047,lng:35.0921},
+            "חדרה": {lat:32.4336,lng:34.9186}, "קריית גת": {lat:31.6100,lng:34.7642},
+            "אילת": {lat:29.5569,lng:34.9519}, "עכו": {lat:32.9232,lng:35.0682},
+            "צפת": {lat:32.9658,lng:35.4965}, "רמת השרון": {lat:32.1449,lng:34.8376},
+            "הוד השרון": {lat:32.1508,lng:34.8974}, "גבעתיים": {lat:32.0686,lng:34.8115},
+            "קריית אונו": {lat:32.0540,lng:34.8560}, "אור יהודה": {lat:32.0275,lng:34.8543},
+            "טירת כרמל": {lat:32.7590,lng:34.9720}, "מגדל העמק": {lat:32.6796,lng:35.2396},
+            "שדרות": {lat:31.5261,lng:34.5975}, "נתיבות": {lat:31.4233,lng:34.5899},
+            "אופקים": {lat:31.3124,lng:34.6213}, "דימונה": {lat:31.0681,lng:35.0332},
+            "ירוחם": {lat:30.9862,lng:34.9278}, "מצפה רמון": {lat:30.6108,lng:34.8013},
+            "טבריה": {lat:32.7940,lng:35.5310}, "קריית שמונה": {lat:33.2075,lng:35.5701},
+            "מעלות-תרשיחא": {lat:33.0155,lng:35.2741}, "כרמיאל": {lat:32.9187,lng:35.2970},
+            "יוקנעם עילית": {lat:32.6592,lng:35.1155}, "אריאל": {lat:32.1062,lng:35.1671},
+            "גדרה": {lat:31.8134,lng:34.7789}, "כפר יונה": {lat:32.2974,lng:34.9370},
+            "רעננה": {lat:32.1849,lng:34.8706}, "גן יבנה": {lat:31.7908,lng:34.7044},
+            "יבנה": {lat:31.8693,lng:34.7432}, "זכרון יעקב": {lat:32.5693,lng:34.9536},
+            "בנימינה": {lat:32.5268,lng:34.9490}, "פרדס חנה-כרכור": {lat:32.4729,lng:34.9655},
+            "אלפי מנשה": {lat:32.1622,lng:35.0254}, "מודיעין עילית": {lat:31.9334,lng:35.0435},
+            "ביתר עילית": {lat:31.6936,lng:35.1139}, "אלעד": {lat:32.0515,lng:34.9513},
+            "אבן יהודה": {lat:32.2721,lng:34.8960}, "גבעת שמואל": {lat:32.0817,lng:34.8445},
+            "קדימה-צורן": {lat:32.2767,lng:34.9113}, "שוהם": {lat:31.9954,lng:34.9461},
+            "ראש העין": {lat:32.0918,lng:34.9571}, "קריית ביאליק": {lat:32.8333,lng:35.0879},
+            "קריית ים": {lat:32.8466,lng:35.0683}, "קריית מוצקין": {lat:32.8374,lng:35.0761},
+            "קריית אתא": {lat:32.8045,lng:35.1033}, "קרית מלאכי": {lat:31.7307,lng:34.7384},
+            "גבעת זאב": {lat:31.8559,lng:35.1658}, "מעלה אדומים": {lat:31.7751,lng:35.3000},
+            "סכנין": {lat:32.8661,lng:35.3014}, "טמרה": {lat:32.8524,lng:35.1960},
+            "שפרעם": {lat:32.8078,lng:35.1686}, "נשר": {lat:32.7740,lng:35.0367},
+            "נוף הגליל": {lat:32.7033,lng:35.3155}, "נצרת": {lat:32.7021,lng:35.2978},
+            "נצרת עילית": {lat:32.7033,lng:35.3155}, "אום אל-פחם": {lat:32.5158,lng:35.1519},
+            "כפר קאסם": {lat:32.1154,lng:34.9787}, "טירה": {lat:32.2352,lng:34.9482},
+            "רהט": {lat:31.3930,lng:34.7542}, "ערד": {lat:31.2576,lng:35.2126},
+            "קצרין": {lat:32.9953,lng:35.6898}, "בית שאן": {lat:32.5004,lng:35.4994},
+            "קיסריה": {lat:32.4994,lng:34.8977}, "שלומי": {lat:33.0796,lng:35.1452},
+            "מעלות": {lat:33.0155,lng:35.2741}, "בית ג'ן": {lat:32.9710,lng:35.3938},
+            "ג'לג'וליה": {lat:32.1559,lng:34.9477}, "טייבה": {lat:32.2696,lng:35.0044},
+            "כפר ורדים": {lat:32.9926,lng:35.2607}, "ראמה": {lat:32.9380,lng:35.3540},
+            "פקיעין": {lat:32.9797,lng:35.3345}, "אבל בית מעכה": {lat:33.2677,lng:35.6826},
+            "מנרה": {lat:33.2433,lng:35.6100}, "יפתח": {lat:33.1289,lng:35.5745},
+            "לקיה": {lat:31.3671,lng:34.8685}, "כסיפה": {lat:31.1986,lng:35.1088},
+            "גן שמואל": {lat:32.5191,lng:34.9691}, "יוקנעם": {lat:32.6602,lng:35.1155},
+            "עמנואל": {lat:32.1570,lng:35.1427}, "כחל": {lat:33.0528,lng:35.2046},
+            "עמקה": {lat:32.9793,lng:35.2099}, "ירכא": {lat:32.9539,lng:35.2006},
+            "חורפיש": {lat:33.0133,lng:35.2928}, "עראבה": {lat:32.8549,lng:35.3363},
+            "כברי": {lat:33.0167,lng:35.1167}, "לוחמי הגטאות": {lat:32.9720,lng:35.0926},
+            "כפר חסידים": {lat:32.7602,lng:35.1167}, "בסמת טבעון": {lat:32.7227,lng:35.1636},
+            "ריינה": {lat:32.7239,lng:35.3065}, "יפיע": {lat:32.6828,lng:35.2808},
+            "דבורייה": {lat:32.6895,lng:35.3776}, "כפר תבור": {lat:32.6881,lng:35.4174},
+            "נהלל": {lat:32.6885,lng:35.2180}, "טול כרם": {lat:32.3106,lng:35.0283},
+            "גדיש": {lat:32.5483,lng:35.1617}, "שבי שומרון": {lat:32.2197,lng:35.1835},
+            "תל מונד": {lat:32.2568,lng:34.9218}, "צור יגאל": {lat:32.2356,lng:34.9613},
+            "הרצליה פיתוח": {lat:32.1664,lng:34.8437},
+            "כפר סבא - רעננה": {lat:32.1757,lng:34.9074}
+        };
+        const _geocodeCacheClient = {};
+
         function haversineKmUser(lat1, lng1, lat2, lng2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -974,6 +1042,21 @@
         }
 
         async function geocodeCityUser(city) {
+            if (_geocodeCacheClient[city]) return _geocodeCacheClient[city];
+            // קודם טבלה סטטית — מהיר ומהימן
+            const norm = city.trim().replace(/\s+/g, " ");
+            if (ISRAEL_CITIES_CLIENT[norm]) {
+                _geocodeCacheClient[city] = ISRAEL_CITIES_CLIENT[norm];
+                return ISRAEL_CITIES_CLIENT[norm];
+            }
+            // חפש גם עם וריאציות של מקפים
+            const keys = Object.keys(ISRAEL_CITIES_CLIENT);
+            const found = keys.find(k => k.replace(/[-–]/g," ") === norm.replace(/[-–]/g," "));
+            if (found) {
+                _geocodeCacheClient[city] = ISRAEL_CITIES_CLIENT[found];
+                return ISRAEL_CITIES_CLIENT[found];
+            }
+            // גיבוי: Nominatim — איטי, עלול להיכשל
             try {
                 const res = await fetch(
                     'https://nominatim.openstreetmap.org/search?q=' +
@@ -981,7 +1064,9 @@
                 );
                 const data = await res.json();
                 if (data && data.length > 0) {
-                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                    const result = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                    _geocodeCacheClient[city] = result;
+                    return result;
                 }
             } catch(e) {}
             return null;
@@ -1009,28 +1094,45 @@
 
                 console.log('[UserPoll] אזעקה:', cities);
 
-                // בדוק אם המשתמש קרוב לאחת הערים
+                // ─── סינון לפי GPS — זהה לשרת ───
                 const uLat = lastKnownLat;
                 const uLng = lastKnownLng;
+
+                // אין GPS בכלל — לא מציגים שום התראה
+                if (!uLat || !uLng) {
+                    console.log('[UserPoll] ❌ אין GPS — לא מציג התראה');
+                    return;
+                }
+
                 let nearby = false;
+                let anyCityGeocoded = false; // האם לפחות עיר אחת עברה geocoding
 
                 for (const city of cities) {
-                    if (uLat && uLng) {
-                        const coords = await geocodeCityUser(city);
-                        if (!coords) {
-                            // geocoding נכשל — לא נפספס, מניחים שקרוב
-                            nearby = true; break;
-                        }
-                        if (haversineKmUser(uLat, uLng, coords.lat, coords.lng) <= 20) {
-                            nearby = true; break;
-                        }
-                    } else {
-                        // אין GPS — שלח תמיד (לא ידוע איפה המשתמש)
-                        nearby = true; break;
+                    const coords = await geocodeCityUser(city);
+                    if (!coords) {
+                        // geocoding נכשל לעיר זו — דלג לעיר הבאה (כמו השרת)
+                        console.log(`[UserPoll] ⚠️ geocoding נכשל: ${city} — מדלג`);
+                        continue;
+                    }
+                    anyCityGeocoded = true;
+                    const dist = haversineKmUser(uLat, uLng, coords.lat, coords.lng);
+                    console.log(`[UserPoll] ${city}: ${dist.toFixed(1)}ק"מ ממני`);
+                    if (dist <= 20) {
+                        nearby = true;
+                        break;
                     }
                 }
 
-                if (!nearby) return;
+                // geocoding נכשל לכל הערים — fallback בטוח: הצג (כמו השרת)
+                if (!anyCityGeocoded) {
+                    console.log('[UserPoll] ⚠️ geocoding נכשל לכל הערים — מציג כ-safe fallback');
+                    nearby = true;
+                }
+
+                if (!nearby) {
+                    console.log('[UserPoll] 🚫 אזעקה רחוקה — לא מציג');
+                    return;
+                }
 
                 // כתוב ל-Firestore → Cloud Function ישלח FCM לשאר הצוות
                 try {
