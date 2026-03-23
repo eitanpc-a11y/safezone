@@ -1354,6 +1354,37 @@
             const isLocked    = localStorage.getItem('safezone_locked') === '1';
             if (savedStatus) highlightStatusBtn(savedStatus);
             if (isLocked) lockButtons();
+
+            // רענן GPS מיד בפתיחת האפ — מבטיח שה-Firestore תמיד מעודכן
+            const token = localStorage.getItem('safezone_token');
+            if (token) _refreshGpsNow(token);
+        }
+
+        // רענון GPS מיידי — נקרא בכל פתיחת אפ
+        // מבטיח ש-Firestore תמיד מכיל את המיקום הנוכחי
+        function _refreshGpsNow(token) {
+            if (!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    lastKnownLat = lat;
+                    lastKnownLng = lng;
+                    updateGpsStatusDisplay();
+                    try {
+                        await db.collection('tokens').doc(token).update({
+                            lat, lng,
+                            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log(`[GPS] ✅ מיקום עודכן: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                    } catch(e) { console.warn('[GPS] שגיאה בשמירה:', e.message); }
+                },
+                (err) => {
+                    console.log('[GPS] לא הצלחנו לקבל מיקום:', err.message);
+                    updateGpsStatusDisplay(); // יציג ⚠️ אין GPS
+                },
+                { timeout: 10000, enableHighAccuracy: true, maximumAge: 60000 }
+            );
         }
 
         // ===== בחירת מיקום ידנית =====
@@ -1426,17 +1457,50 @@
         async function updateLocation() {
             if (!currentToken) return;
             const btn = document.getElementById('updateLocBtn');
-            btn.textContent = '📍 ...';
+            btn.textContent = '📍 מאתר GPS...';
 
+            // ניסיון ראשון — GPS אמיתי (מהיר, מדויק)
+            const gpsLoc = await new Promise(resolve => {
+                if (!navigator.geolocation) { resolve(null); return; }
+                navigator.geolocation.getCurrentPosition(
+                    pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                    () => resolve(null),
+                    { timeout: 8000, enableHighAccuracy: true }
+                );
+            });
+
+            if (gpsLoc) {
+                // GPS עבד — שמור ישירות
+                try {
+                    lastKnownLat = gpsLoc.lat;
+                    lastKnownLng = gpsLoc.lng;
+                    await db.collection('tokens').doc(currentToken).update({
+                        lat: gpsLoc.lat, lng: gpsLoc.lng,
+                        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    btn.textContent = '✅ GPS עודכן!';
+                    updateGpsStatusDisplay();
+                    setTimeout(() => { btn.textContent = T('btn_update_loc'); }, 3000);
+                } catch(e) {
+                    btn.textContent = T('btn_update_loc');
+                    alert('שגיאה בשמירה: ' + e.message);
+                }
+                return;
+            }
+
+            // GPS נכשל — פתח מפה לבחירה ידנית
+            btn.textContent = T('btn_update_loc');
             try {
-                // פתח מפה לבחירה ידנית ישירות — ללא ניסיון GPS
                 const loc = await new Promise((resolve, reject) => openMapPicker(resolve, reject));
                 await db.collection('tokens').doc(currentToken).update({
-                    lat: loc.lat,
-                    lng: loc.lng
+                    lat: loc.lat, lng: loc.lng,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                btn.textContent = '✅';
-                setTimeout(() => { btn.textContent = T('btn_update_loc'); }, 2500);
+                lastKnownLat = loc.lat;
+                lastKnownLng = loc.lng;
+                btn.textContent = '✅ מיקום עודכן';
+                updateGpsStatusDisplay();
+                setTimeout(() => { btn.textContent = T('btn_update_loc'); }, 3000);
             } catch(e) {
                 if (e.message !== 'ביטול') alert('שגיאה בעדכון מיקום: ' + e.message);
                 btn.textContent = T('btn_update_loc');
