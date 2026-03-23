@@ -936,6 +936,7 @@
                     if (pos.coords.accuracy > 1000) return;
                     lastKnownLat = pos.coords.latitude;
                     lastKnownLng = pos.coords.longitude;
+                    updateGpsStatusDisplay(); // עדכן תצוגת GPS מיד
                     const now = Date.now();
                     if (now - lastLocUpdate < 30000) return;
                     lastLocUpdate = now;
@@ -947,7 +948,10 @@
                         });
                     } catch(e) {}
                 },
-                (err) => { console.log('GPS שגיאה:', err.message); },
+                (err) => {
+                    console.log('GPS שגיאה:', err.message);
+                    updateGpsStatusDisplay(); // הצג אזהרת "אין GPS"
+                },
                 { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
             );
         }
@@ -1297,16 +1301,53 @@
             el.className = cls || '';
         }
 
+        function updateGpsStatusDisplay() {
+            const el = document.getElementById('loc-info');
+            if (!el) return;
+            const name = localStorage.getItem('safezone_name') || '';
+            const city = localStorage.getItem('safezone_city') || '';
+            if (lastKnownLat && lastKnownLng) {
+                el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#2ecc71;">📍 GPS פעיל</span>`;
+            } else {
+                el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#e67e22;cursor:pointer;text-decoration:underline;" onclick="triggerGpsUpdate()">⚠️ אין GPS — לחץ לעדכון</span>`;
+            }
+        }
+
+        async function triggerGpsUpdate() {
+            const el = document.getElementById('loc-info');
+            if (el) el.innerHTML = el.innerHTML.replace(/⚠️.*/, '⏳ מאתר מיקום...');
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    lastKnownLat = pos.coords.latitude;
+                    lastKnownLng = pos.coords.longitude;
+                    if (currentToken) {
+                        try {
+                            await db.collection('tokens').doc(currentToken).update({
+                                lat: lastKnownLat, lng: lastKnownLng,
+                                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } catch(e) {}
+                    }
+                    updateGpsStatusDisplay();
+                },
+                () => {
+                    // GPS נכשל — פתח מפה
+                    updateLocation();
+                },
+                { timeout: 10000, enableHighAccuracy: true }
+            );
+        }
+
         function showActiveState() {
             const name = localStorage.getItem('safezone_name') || '';
             const city = localStorage.getItem('safezone_city') || '';
             setStatus(T('status_active'), 'status-active');
-            document.getElementById('loc-info').textContent = `${name} — ${city}`;
             document.getElementById('register-panel').style.display = 'none';
             document.getElementById('status-panel').style.display = 'block';
             document.getElementById('deactivateBtn').style.display = 'block';
             document.getElementById('updateLocBtn').style.display = 'inline-block';
             document.getElementById('testPushBtn').style.display = 'block';
+            updateGpsStatusDisplay();
 
             // שחזר מצב נעילה
             const savedStatus = localStorage.getItem('safezone_status');

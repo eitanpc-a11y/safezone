@@ -706,11 +706,11 @@
             const res = await fetch('/api/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "4.2";
+                const ok = d.version === "4.3";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} — tzevaadom ראשון, לוג פרוקסי, זיהוי חסימה, 4 מקורות`
-                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש! (נוכחית: 4.2)`;
+                    ? `✅ גרסה ${d.version} — 100+ ערים, GPS סטטוס, סינון מיקום מדויק`
+                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy חדש! (נוכחית: 4.3)`;
             }
         } catch(e) {
             if (bar) {
