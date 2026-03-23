@@ -1032,7 +1032,22 @@
             "גדיש": {lat:32.5483,lng:35.1617}, "שבי שומרון": {lat:32.2197,lng:35.1835},
             "תל מונד": {lat:32.2568,lng:34.9218}, "צור יגאל": {lat:32.2356,lng:34.9613},
             "הרצליה פיתוח": {lat:32.1664,lng:34.8437},
-            "כפר סבא - רעננה": {lat:32.1757,lng:34.9074}
+            "כפר סבא - רעננה": {lat:32.1757,lng:34.9074},
+            "רותם": {lat:32.4745,lng:35.4923}, "קיבוץ רותם": {lat:32.4745,lng:35.4923},
+            "חמדיה": {lat:32.5498,lng:35.5298}, "בית אלפא": {lat:32.5301,lng:35.4313},
+            "חניתה": {lat:33.0853,lng:35.2012}, "שומרה": {lat:33.0802,lng:35.2272},
+            "מעיין ברוך": {lat:33.2283,lng:35.6150}, "כפר גלעדי": {lat:33.2283,lng:35.5683},
+            "מטולה": {lat:33.2704,lng:35.5753}, "גונן": {lat:33.1750,lng:35.6300},
+            "אמיר": {lat:33.1817,lng:35.6133}, "כפר בלום": {lat:33.1833,lng:35.6083},
+            "שאר ישוב": {lat:33.2333,lng:35.6333}, "דן": {lat:33.2500,lng:35.6500},
+            "דפנה": {lat:33.2333,lng:35.6417}, "מרום גולן": {lat:33.1500,lng:35.8167},
+            "ניר עם": {lat:31.5167,lng:34.5833}, "נחל עוז": {lat:31.4833,lng:34.5167},
+            "ארז": {lat:31.4167,lng:34.4833}, "כיסופים": {lat:31.3833,lng:34.4833},
+            "אורים": {lat:31.3333,lng:34.5500}, "רעים": {lat:31.4000,lng:34.4667},
+            "תקומה": {lat:31.4667,lng:34.5500}, "שדה בוקר": {lat:30.8711,lng:34.7861},
+            "קריית ארבע": {lat:31.5333,lng:35.1167}, "אפרת": {lat:31.6500,lng:35.1500},
+            "גוש עציון": {lat:31.6500,lng:35.1167}, "מבשרת ציון": {lat:31.8000,lng:35.1333},
+            "יטבתה": {lat:29.8833,lng:35.0667}, "ספיר": {lat:29.9667,lng:35.2167}
         };
         const _geocodeCacheClient = {};
 
@@ -1122,7 +1137,7 @@
                     anyCityGeocoded = true;
                     const dist = haversineKmUser(uLat, uLng, coords.lat, coords.lng);
                     console.log(`[UserPoll] ${city}: ${dist.toFixed(1)}ק"מ ממני`);
-                    if (dist <= 10) {
+                    if (dist <= 5) {
                         nearby = true;
                         break;
                     }
@@ -1301,9 +1316,36 @@
         // ===== הקשבה להודעות מה-Service Worker =====
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'NEW_ALERT' && currentToken) {
+                if (!event.data) return;
+
+                // אזעקה חדשה — פתח כפתורים
+                if (event.data.type === 'NEW_ALERT' && currentToken) {
                     unlockButtons(true);
                     showAlertBanner();
+                }
+
+                // ה-Service Worker מבקש עדכון GPS (ברגע שהגיע Push)
+                // עובד כשהאפליקציה פתוחה ברקע ב-Android
+                if (event.data.type === 'REQUEST_GPS_UPDATE') {
+                    const token = currentToken || localStorage.getItem('safezone_token');
+                    if (token && navigator.geolocation) {
+                        console.log('[GPS] Service Worker ביקש עדכון GPS — מעדכן Firestore...');
+                        navigator.geolocation.getCurrentPosition(
+                            function(pos) {
+                                const lat = pos.coords.latitude;
+                                const lng = pos.coords.longitude;
+                                lastKnownLat = lat;
+                                lastKnownLng = lng;
+                                updateGpsStatusDisplay();
+                                // שמור ב-Firestore כדי שהשרת ידע איפה אתה עכשיו
+                                db.collection('tokens').doc(token).update({ lat, lng, gpsUpdatedAt: Date.now() })
+                                    .then(function() { console.log(`[GPS] עודכן ל-(${lat.toFixed(4)},${lng.toFixed(4)})`); })
+                                    .catch(function(e) { console.warn('[GPS] שגיאה בעדכון:', e.message); });
+                            },
+                            function(err) { console.warn('[GPS] לא הצלחנו לקבל מיקום:', err.message); },
+                            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                        );
+                    }
                 }
             });
         }
@@ -1412,33 +1454,45 @@
             const el = document.getElementById('loc-info');
             if (!el) return;
             const name = localStorage.getItem('safezone_name') || '';
-            const city = localStorage.getItem('safezone_city') || '';
             if (lastKnownLat && lastKnownLng) {
-                el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#2ecc71;">📍 GPS פעיל</span> <span style="color:rgba(255,255,255,0.35);font-size:0.7rem;">(${lastKnownLat.toFixed(4)}, ${lastKnownLng.toFixed(4)})</span>`;
+                // מצא את העיר הקרובה ביותר למיקום הנוכחי
+                const nearest = findNearestCityClient(lastKnownLat, lastKnownLng);
+                const cityLabel = nearest ? `📍 ${nearest.name}` : '📍 GPS פעיל';
+                el.innerHTML = `${name} &nbsp;|&nbsp; <span style="color:#2ecc71;">${cityLabel}</span> <span style="color:rgba(255,255,255,0.3);font-size:0.7rem;">(${lastKnownLat.toFixed(4)}, ${lastKnownLng.toFixed(4)})</span>`;
             } else {
-                el.innerHTML = `${name} — ${city} &nbsp;|&nbsp; <span style="color:#e67e22;cursor:pointer;text-decoration:underline;" onclick="triggerGpsUpdate()">⚠️ אין GPS — לחץ לעדכון</span>`;
+                el.innerHTML = `${name} &nbsp;|&nbsp; <span style="color:#e67e22;cursor:pointer;text-decoration:underline;" onclick="triggerGpsUpdate()">⚠️ אין GPS — לחץ לעדכון</span>`;
             }
         }
 
-        // בדיקת גרסת שרת בהפעלה — מזהיר אם ישן
-        const REQUIRED_SERVER_VERSION = "4.5";
+        // מצא עיר קרובה ביותר למיקום GPS של המשתמש (צד לקוח)
+        function findNearestCityClient(lat, lng) {
+            let bestName = null, bestDist = Infinity;
+            for (const [name, coords] of Object.entries(ISRAEL_CITIES_CLIENT)) {
+                const d = haversineKmUser(lat, lng, coords.lat, coords.lng);
+                if (d < bestDist) { bestDist = d; bestName = name; }
+            }
+            return { name: bestName, distKm: bestDist };
+        }
+
+        // URL ישיר לCloud Function — עובד גם ב-PWA מותקן
+        const VERSION_CHECK_URL = 'https://me-west1-safezone-cd4b5.cloudfunctions.net/version';
+        const REQUIRED_SERVER_VERSION = "4.7";
+
         async function checkServerVersion() {
             const banner = document.getElementById('server-version-banner');
             if (!banner) return;
             try {
-                const res = await fetch('/api/version');
+                const res = await fetch(VERSION_CHECK_URL, { cache: 'no-store' });
                 const d = await res.json();
                 if (d.version !== REQUIRED_SERVER_VERSION) {
                     banner.style.display = 'block';
-                    banner.innerHTML = `⛔ שרת ישן! גרסה ${d.version || '?'} — התראות נשלחות לכולם ללא סינון GPS!<br>
-                        <strong>חובה להריץ: <code>firebase deploy --only functions,hosting</code></strong>`;
+                    banner.innerHTML = `⛔ שרת ישן (${d.version || '?'}) — חובה להריץ: <code>firebase deploy --only functions</code>`;
                 } else {
-                    // גרסה נכונה — הסתר
                     banner.style.display = 'none';
                 }
             } catch(e) {
-                banner.style.display = 'block';
-                banner.innerHTML = '⚠️ לא ניתן לבדוק גרסת שרת — בדוק חיבור אינטרנט';
+                // שקט — אל תציג שגיאה אם הבדיקה נכשלת (רשת חלשה וכו')
+                console.warn('[Version] לא ניתן לבדוק:', e.message);
             }
         }
 

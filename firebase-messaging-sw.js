@@ -17,15 +17,20 @@ messaging.onBackgroundMessage(function(payload) {
     const title = payload.notification?.title || '🚨 צבע אדום!';
     const body  = payload.notification?.body  || 'אזעקה באזורך — היכנס למרחב מוגן';
 
-    // הודע לכל לשוניות פתוחות לפתוח את הכפתורים
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-        windowClients.forEach(function(client) {
-            client.postMessage({ type: 'NEW_ALERT' });
+    // שלב 1: בקש מהאפליקציה לעדכן GPS עכשיו (אם פתוחה/רקע)
+    // זה קריטי — כדי שה-GPS בפיירסטור יהיה עדכני לפני ההתרעה הבאה
+    const notifyClientsPromise = self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then(function(windowClients) {
+            windowClients.forEach(function(client) {
+                // שלח שני הודעות: אחת לעדכון GPS ואחת לפתיחת כפתורי אזעקה
+                client.postMessage({ type: 'REQUEST_GPS_UPDATE' });
+                client.postMessage({ type: 'NEW_ALERT' });
+            });
         });
-    });
 
-    // הצג push notification (ללא קול מותאם — קול מערכת בלבד)
-    return self.registration.showNotification(title, {
+    // שלב 2: הצג push notification
+    const showNotifPromise = self.registration.showNotification(title, {
         body: body,
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-72.png',
@@ -43,6 +48,8 @@ messaging.onBackgroundMessage(function(payload) {
         ],
         data: payload.data || {}
     });
+
+    return Promise.all([notifyClientsPromise, showNotifPromise]);
 });
 
 // לחיצה על הנוטיפיקציה או כפתורי הפעולה
@@ -59,14 +66,16 @@ self.addEventListener('notificationclick', function(event) {
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-            // אם האפליקציה כבר פתוחה — נווט אליה
+            // אם האפליקציה כבר פתוחה — נווט אליה + בקש GPS
             for (const client of windowClients) {
                 if ('focus' in client) {
+                    // עדכן GPS מיד כשהמשתמש לחץ על הנוטיפיקציה
+                    client.postMessage({ type: 'REQUEST_GPS_UPDATE' });
                     client.navigate(url);
                     return client.focus();
                 }
             }
-            // פתח חלון חדש
+            // פתח חלון חדש — GPS יתעדכן אוטומטית בהפעלה
             if (clients.openWindow) return clients.openWindow(url);
         })
     );

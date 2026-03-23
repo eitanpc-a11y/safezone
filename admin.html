@@ -706,11 +706,11 @@
             const res = await fetch('/api/version');
             const d = await res.json();
             if (bar) {
-                const ok = d.version === "4.6";
+                const ok = d.version === "4.7";
                 bar.style.color = ok ? '#2a6a2a' : '#c0392b';
                 bar.textContent = ok
-                    ? `✅ גרסה ${d.version} — מצב קשוח: רק GPS, 200+ ערים, אפס fallbacks`
-                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy! (נדרשת: 4.6)`;
+                    ? `✅ גרסה ${d.version} — סינון GPS קשוח: רק אותה עיר (5ק"מ), 200+ ערים`
+                    : `⚠️ גרסה ${d.version || '?'} — דרוש firebase deploy! (נדרשת: 4.7)`;
             }
         } catch(e) {
             if (bar) {
